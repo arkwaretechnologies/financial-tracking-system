@@ -26,6 +26,7 @@ export default function LoginPage() {
     
     // Validate client ID exists
     const mockClients = {
+      '12345': { name: 'Test Corporation', adminPassword: 'admin123', userPassword: 'user123' },
       'CLIENT001': { name: 'ABC Corporation', adminPassword: 'admin123', userPassword: 'user123' },
       'CLIENT002': { name: 'XYZ Industries', adminPassword: 'admin456', userPassword: 'user456' },
       'CLIENT003': { name: 'Demo Client', adminPassword: 'demo123', userPassword: 'demo123' }
