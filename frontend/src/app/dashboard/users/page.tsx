@@ -10,32 +10,73 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Trash2, Edit, Plus, Users as UsersIcon } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface ClientUser {
   id: string;
   email: string;
   name: string;
   role: 'admin' | 'user';
-  store_id?: string;
-  store_name?: string;
+  store_id: string;
+  store_name: string;
   created_at: string;
   status: 'active' | 'inactive';
+}
+
+interface Role {
+  id: string;
+  name: string;
+  description: string;
+  permissions: string[]; // page slugs like 'sales', 'purchases', etc.
 }
 
 export default function ClientUsersPage() {
   const { user } = useAuth();
   const [users, setUsers] = useState<ClientUser[]>([]);
   const [loading, setLoading] = useState(true);
-  const [newUser, setNewUser] = useState({ 
-    email: '', 
-    name: '', 
+  const [newUser, setNewUser] = useState({
+    email: '',
+    name: '',
     role: 'user' as 'admin' | 'user',
-    store_id: '' 
+    store_id: ''
   });
   const [editingUser, setEditingUser] = useState<ClientUser | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isAddRoleDialogOpen, setIsAddRoleDialogOpen] = useState(false);
+  const [newRole, setNewRole] = useState<Omit<Role, 'id'>>({ name: '', description: '', permissions: [] });
+  const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
+  const [roles, setRoles] = useState<Role[]>([
+    { id: '1', name: 'Admin', description: 'Full access to all features', permissions: ['sales', 'purchases', 'user-management', 'stores', 'reports', 'settings'] },
+    { id: '2', name: 'Manager', description: 'Manage operations and users', permissions: ['sales', 'purchases', 'user-management', 'stores'] },
+    { id: '3', name: 'Viewer', description: 'Can view reports only', permissions: ['reports'] },
+  ]);
+  // Add role edit dialog state
+  const [isEditRoleDialogOpen, setIsEditRoleDialogOpen] = useState(false);
+  const [roleToEdit, setRoleToEdit] = useState<Role | null>(null);
+
+  // Define the current pages for role assignment
+  const availablePages = [
+    { value: 'sales', label: 'Sales' },
+    { value: 'purchases', label: 'Purchases' },
+    { value: 'user-management', label: 'User Management' },
+    { value: 'stores', label: 'Stores' },
+    { value: 'reports', label: 'Reports' },
+    { value: 'settings', label: 'Settings' },
+  ];
+
+  // Group pages by module for better UX
+  const pageGroups = [
+    { label: 'Operations', items: ['sales', 'purchases'] },
+    { label: 'Management', items: ['user-management', 'stores'] },
+    { label: 'Reporting', items: ['reports'] },
+    { label: 'Settings', items: ['settings'] },
+  ];
+
+  // Helper to show labels from values
+  const pageLabel = (value: string) => availablePages.find(p => p.value === value)?.label ?? value;
 
   // Mock stores for the current client
   const clientStores = [
@@ -88,7 +129,7 @@ export default function ClientUsersPage() {
         status: 'active'
       }
     ];
-    
+
     setUsers(mockUsers);
     setLoading(false);
   }, []);
@@ -104,20 +145,43 @@ export default function ClientUsersPage() {
       created_at: new Date().toISOString().split('T')[0],
       status: 'active'
     };
-    
+
     setUsers([...users, user]);
     setNewUser({ email: '', name: '', role: 'user', store_id: '' });
     setIsAddDialogOpen(false);
   };
 
+  const handleAddRole = () => {
+    setRoles([
+      ...roles,
+      { ...newRole, id: String(roles.length + 1), permissions: selectedPermissions },
+    ]);
+    setNewRole({ name: '', description: '', permissions: [] });
+    setSelectedPermissions([]);
+    setIsAddRoleDialogOpen(false);
+  };
+
+  // Update existing role
+  const handleUpdateRole = () => {
+    if (!roleToEdit) return;
+    setRoles(roles.map(r => r.id === roleToEdit.id ? { ...roleToEdit, permissions: selectedPermissions } : r));
+    setRoleToEdit(null);
+    setSelectedPermissions([]);
+    setIsEditRoleDialogOpen(false);
+  };
+
+  // Delete role
+  const handleDeleteRole = (roleId: string) => {
+    setRoles(roles.filter(r => r.id !== roleId));
+  };
   const handleEditUser = () => {
     if (!editingUser) return;
-    
-    setUsers(users.map(u => 
-      u.id === editingUser.id 
-        ? { 
-            ...editingUser, 
-            store_name: clientStores.find(s => s.id === editingUser.store_id)?.name || '' 
+
+    setUsers(users.map(u =>
+      u.id === editingUser.id
+        ? {
+            ...editingUser,
+            store_name: clientStores.find(s => s.id === editingUser.store_id)?.name || ''
           }
         : u
     ));
@@ -130,8 +194,8 @@ export default function ClientUsersPage() {
   };
 
   const toggleUserStatus = (userId: string) => {
-    setUsers(users.map(u => 
-      u.id === userId 
+    setUsers(users.map(u =>
+      u.id === userId
         ? { ...u, status: u.status === 'active' ? 'inactive' : 'active' }
         : u
     ));
@@ -281,75 +345,353 @@ export default function ClientUsersPage() {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Users</CardTitle>
-          <CardDescription>
-            Manage user accounts and permissions for your organization.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Store</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {users.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell className="font-medium">{user.name}</TableCell>
-                  <TableCell>{user.email}</TableCell>
-                  <TableCell>
-                    <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
-                      {user.role}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{user.store_name || 'All Stores'}</TableCell>
-                  <TableCell>
-                    <Badge 
-                      variant={user.status === 'active' ? 'default' : 'destructive'}
-                      className="cursor-pointer"
-                      onClick={() => toggleUserStatus(user.id)}
-                    >
-                      {user.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{new Date(user.created_at).toLocaleDateString()}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setEditingUser(user);
-                          setIsEditDialogOpen(true);
-                        }}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDeleteUser(user.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <Tabs defaultValue="users" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="users">Users</TabsTrigger>
+          <TabsTrigger value="roles">Roles</TabsTrigger>
+        </TabsList>
+        <TabsContent value="users" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Users</CardTitle>
+              <CardDescription>
+                Manage user accounts and permissions for your organization.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Store</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Created</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {users.map((user) => (
+                    <TableRow key={user.id}>
+                      <TableCell className="font-medium">{user.name}</TableCell>
+                      <TableCell>{user.email}</TableCell>
+                      <TableCell>
+                        <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
+                          {user.role}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{user.store_name || 'All Stores'}</TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={user.status === 'active' ? 'default' : 'destructive'}
+                          className="cursor-pointer"
+                          onClick={() => toggleUserStatus(user.id)}
+                        >
+                          {user.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{new Date(user.created_at).toLocaleDateString()}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setEditingUser(user);
+                              setIsEditDialogOpen(true);
+                            }}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteUser(user.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="roles" className="space-y-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle>Roles</CardTitle>
+              <CardDescription>
+                Manage roles and their permissions for your organization.
+              </CardDescription>
+              <Button size="sm" onClick={() => setIsAddRoleDialogOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Role
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Role Name</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead>Permissions</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {roles.map((role) => (
+                    <TableRow key={role.id}>
+                      <TableCell className="font-medium">{role.name}</TableCell>
+                      <TableCell>{role.description}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {role.permissions.map((permission) => (
+                            <Badge key={permission} variant="secondary">
+                              {pageLabel(permission)}
+                            </Badge>
+                          ))}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => { 
+                              setRoleToEdit(role);
+                              setSelectedPermissions(role.permissions);
+                              setIsEditRoleDialogOpen(true);
+                            }}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteRole(role.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
+      {/* Add Role Dialog */}
+      <Dialog open={isAddRoleDialogOpen} onOpenChange={setIsAddRoleDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add New Role</DialogTitle>
+            <DialogDescription>
+              Create a new role and assign its permissions.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="role-name">Role Name</Label>
+              <Input
+                id="role-name"
+                value={newRole.name}
+                onChange={(e) => setNewRole({ ...newRole, name: e.target.value })}
+                placeholder="Enter role name (e.g., Manager, Viewer)"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="role-description">Description</Label>
+              <Input
+                id="role-description"
+                value={newRole.description}
+                onChange={(e) => setNewRole({ ...newRole, description: e.target.value })}
+                placeholder="Brief description of the role"
+              />
+            </div>
+            {/* Permissions */}
+            <div className="grid gap-2">
+              <Label>Permissions</Label>
+              <div className="grid grid-cols-2 gap-4 pt-2">
+                {pageGroups.map(group => (
+                  <div key={group.label} className="p-4 border rounded-lg">
+                    <div className="flex justify-between items-center mb-2">
+                      <h4 className="font-medium">{group.label}</h4>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="link"
+                          size="sm"
+                          className="h-auto p-0"
+                          onClick={() => {
+                            const newPermissions = [...new Set([...selectedPermissions, ...group.items])];
+                            setSelectedPermissions(newPermissions);
+                          }}
+                        >
+                          Select all
+                        </Button>
+                        <Button
+                          variant="link"
+                          size="sm"
+                          className="h-auto p-0"
+                          onClick={() => {
+                            const newPermissions = selectedPermissions.filter(p => !group.items.includes(p));
+                            setSelectedPermissions(newPermissions);
+                          }}
+                        >
+                          Clear
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      {group.items.map((value) => (
+                        <div key={value} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`add-role-${value}`}
+                            checked={selectedPermissions.includes(value)}
+                            onCheckedChange={(checked) => {
+                              const isChecked = checked === true;
+                              if (isChecked) {
+                                setSelectedPermissions([...selectedPermissions, value]);
+                              } else {
+                                setSelectedPermissions(selectedPermissions.filter(v => v !== value));
+                              }
+                            }}
+                          />
+                          <label
+                            htmlFor={`add-role-${value}`}
+                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                          >
+                            {pageLabel(value)}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddRoleDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleAddRole}>Add Role</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Role Dialog */}
+      <Dialog 
+        open={isEditRoleDialogOpen} 
+        onOpenChange={(open) => { 
+          setIsEditRoleDialogOpen(open); 
+          if (!open) { setRoleToEdit(null); setSelectedPermissions([]); }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Role</DialogTitle>
+            <DialogDescription>
+              Update role details and adjust its permissions.
+            </DialogDescription>
+          </DialogHeader>
+          {roleToEdit && (
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-role-name">Role Name</Label>
+                <Input
+                  id="edit-role-name"
+                  value={roleToEdit.name}
+                  onChange={(e) => setRoleToEdit({ ...roleToEdit, name: e.target.value })}
+                  placeholder="Enter role name"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-role-description">Description</Label>
+                <Input
+                  id="edit-role-description"
+                  value={roleToEdit.description}
+                  onChange={(e) => setRoleToEdit({ ...roleToEdit, description: e.target.value })}
+                  placeholder="Brief description of the role"
+                />
+              </div>
+              {/* Permissions */}
+              <div className="grid gap-2">
+                <Label>Permissions</Label>
+                <div className="grid grid-cols-2 gap-4 pt-2">
+                  {pageGroups.map(group => (
+                    <div key={group.label} className="p-4 border rounded-lg">
+                      <div className="flex justify-between items-center mb-2">
+                        <h4 className="font-medium">{group.label}</h4>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="link"
+                            size="sm"
+                            className="h-auto p-0"
+                            onClick={() => {
+                              const newPermissions = [...new Set([...selectedPermissions, ...group.items])];
+                              setSelectedPermissions(newPermissions);
+                            }}
+                          >
+                            Select all
+                          </Button>
+                          <Button
+                            variant="link"
+                            size="sm"
+                            className="h-auto p-0"
+                            onClick={() => {
+                              const newPermissions = selectedPermissions.filter(p => !group.items.includes(p));
+                              setSelectedPermissions(newPermissions);
+                            }}
+                          >
+                            Clear
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        {group.items.map((value) => (
+                          <div key={value} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`edit-role-${value}`}
+                              checked={selectedPermissions.includes(value)}
+                              onCheckedChange={(checked) => {
+                                const isChecked = checked === true;
+                                if (isChecked) {
+                                  setSelectedPermissions([...selectedPermissions, value]);
+                                } else {
+                                  setSelectedPermissions(selectedPermissions.filter(v => v !== value));
+                                }
+                              }}
+                            />
+                            <label
+                              htmlFor={`edit-role-${value}`}
+                              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                            >
+                              {pageLabel(value)}
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setIsEditRoleDialogOpen(false); }}>
+              Cancel
+            </Button>
+            <Button onClick={handleUpdateRole}>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       {/* Edit User Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent>
@@ -380,8 +722,8 @@ export default function ClientUsersPage() {
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="edit-role">Role</Label>
-                <Select 
-                  value={editingUser.role} 
+                <Select
+                  value={editingUser.role}
                   onValueChange={(value: 'admin' | 'user') => setEditingUser({ ...editingUser, role: value })}
                 >
                   <SelectTrigger>
@@ -395,8 +737,8 @@ export default function ClientUsersPage() {
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="edit-store">Store</Label>
-                <Select 
-                  value={editingUser.store_id || ''} 
+                <Select
+                  value={editingUser.store_id || ''}
                   onValueChange={(value) => setEditingUser({ ...editingUser, store_id: value })}
                 >
                   <SelectTrigger>

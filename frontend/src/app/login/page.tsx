@@ -9,13 +9,13 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
-type LoginStep = 'clientId' | 'roleSelection' | 'rolePassword';
+type LoginStep = 'clientId' | 'userLogin';
 
 export default function LoginPage() {
   const [step, setStep] = useState<LoginStep>('clientId');
   const [clientId, setClientId] = useState('');
-  const [selectedRole, setSelectedRole] = useState<'admin' | 'client_user'>('admin');
-  const [rolePassword, setRolePassword] = useState('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
@@ -26,10 +26,10 @@ export default function LoginPage() {
     
     // Validate client ID exists
     const mockClients = {
-      '12345': { name: 'Test Corporation', adminPassword: 'admin123', userPassword: 'user123' },
-      'CLIENT001': { name: 'ABC Corporation', adminPassword: 'admin123', userPassword: 'user123' },
-      'CLIENT002': { name: 'XYZ Industries', adminPassword: 'admin456', userPassword: 'user456' },
-      'CLIENT003': { name: 'Demo Client', adminPassword: 'demo123', userPassword: 'demo123' }
+      '12345': { name: 'Test Corporation' },
+      'CLIENT001': { name: 'ABC Corporation' },
+      'CLIENT002': { name: 'XYZ Industries' },
+      'CLIENT003': { name: 'Demo Client' }
     };
 
     if (!mockClients[clientId as keyof typeof mockClients]) {
@@ -37,21 +37,16 @@ export default function LoginPage() {
       return;
     }
     
-    setStep('roleSelection');
+    setStep('userLogin');
   };
 
-  const handleRoleSelection = (role: 'admin' | 'client_user') => {
-    setSelectedRole(role);
-    setStep('rolePassword');
-  };
-
-  const handleRolePasswordSubmit = async (e: React.FormEvent) => {
+  const handleUserLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
     try {
-      await login(clientId, selectedRole, rolePassword);
+      await login(clientId, username, password);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
       setLoading(false);
@@ -91,10 +86,16 @@ export default function LoginPage() {
           </form>
         );
 
-      case 'roleSelection':
+      case 'userLogin':
         return (
-          <>
+          <form onSubmit={handleUserLoginSubmit}>
             <CardContent className="space-y-4">
+              {error && (
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+              
               <div className="text-center">
                 <p className="text-sm text-gray-600">Client ID: {clientId}</p>
                 <button 
@@ -106,66 +107,56 @@ export default function LoginPage() {
               </div>
               
               <div className="space-y-2">
-                <Label>Select Your Role</Label>
-                <RadioGroup value={selectedRole} onValueChange={(value) => handleRoleSelection(value as 'admin' | 'client_user')}>
-                  <div className="flex items-center space-x-2 p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
-                    <RadioGroupItem value="admin" id="admin" />
-                    <Label htmlFor="admin" className="cursor-pointer flex-1">
-                      <div className="font-medium">Admin</div>
-                      <div className="text-sm text-gray-500">Full access to manage stores, users, and all transactions</div>
-                    </Label>
-                  </div>
-                  
-                  <div className="flex items-center space-x-2 p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
-                    <RadioGroupItem value="client_user" id="client_user" />
-                    <Label htmlFor="client_user" className="cursor-pointer flex-1">
-                      <div className="font-medium">User</div>
-                      <div className="text-sm text-gray-500">Access to record transactions and view reports</div>
-                    </Label>
-                  </div>
-                </RadioGroup>
-              </div>
-            </CardContent>
-          </>
-        );
-
-      case 'rolePassword':
-        return (
-          <form onSubmit={handleRolePasswordSubmit}>
-            <CardContent className="space-y-4">
-              {error && (
-                <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
-              
-              <div className="text-center">
-                <p className="text-sm text-gray-600">Client ID: {clientId}</p>
-                <p className="text-sm text-gray-600">Role: {selectedRole === 'admin' ? 'Admin' : 'User'}</p>
-                <button 
-                  onClick={() => setStep('roleSelection')}
-                  className="text-blue-600 hover:text-blue-800 text-xs"
-                >
-                  ← Change Role
-                </button>
+                <Label htmlFor="username">Username/Email</Label>
+                <Input
+                  id="username"
+                  type="email"
+                  placeholder="Enter your email address"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                />
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="rolePassword">Role Password</Label>
+                <Label htmlFor="password">Password</Label>
                 <Input
-                  id="rolePassword"
+                  id="password"
                   type="password"
-                  placeholder={`Enter ${selectedRole} password`}
-                  value={rolePassword}
-                  onChange={(e) => setRolePassword(e.target.value)}
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   required
                 />
               </div>
               
               <div className="text-xs text-gray-500 bg-gray-50 p-3 rounded">
-                <p className="font-medium mb-1">Demo Credentials:</p>
-                <p>• Admin password: admin123 (for CLIENT001)</p>
-                <p>• User password: user123 (for CLIENT001)</p>
+                <p className="font-medium mb-1">Demo Credentials for {clientId}:</p>
+                {clientId === '12345' && (
+                  <>
+                    <p>• admin@testcorp.com / admin123 (Admin)</p>
+                    <p>• john@testcorp.com / user123 (Store User)</p>
+                    <p>• jane@testcorp.com / user123 (Store User)</p>
+                  </>
+                )}
+                {clientId === 'CLIENT001' && (
+                  <>
+                    <p>• admin@abc.com / admin123 (Admin)</p>
+                    <p>• mike@abc.com / user123 (Store User)</p>
+                  </>
+                )}
+                {clientId === 'CLIENT002' && (
+                  <>
+                    <p>• admin@xyz.com / admin456 (Admin)</p>
+                    <p>• sarah@xyz.com / user456 (Store User)</p>
+                  </>
+                )}
+                {clientId === 'CLIENT003' && (
+                  <>
+                    <p>• demo@demo.com / demo123 (Admin)</p>
+                    <p>• user@demo.com / demo123 (Store User)</p>
+                  </>
+                )}
               </div>
             </CardContent>
             
@@ -180,36 +171,34 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900">Financial Tracking System</h1>
-          <p className="mt-2 text-gray-600">Client Portal</p>
-        </div>
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl font-bold">
+            {step === 'clientId' ? 'Client Login' : 'User Login'}
+          </CardTitle>
+          <CardDescription>
+            {step === 'clientId' 
+              ? 'Enter your client ID to continue' 
+              : 'Enter your credentials to access the system'
+            }
+          </CardDescription>
+        </CardHeader>
         
-        <Card>
-          <CardHeader>
-            <CardTitle>
-              {step === 'clientId' && 'Client Login'}
-              {step === 'roleSelection' && 'Select Role'}
-              {step === 'rolePassword' && 'Enter Password'}
-            </CardTitle>
-            <CardDescription>
-              {step === 'clientId' && 'Enter your Client ID to access the system'}
-              {step === 'roleSelection' && 'Choose your access level'}
-              {step === 'rolePassword' && `Enter your ${selectedRole} password`}
-            </CardDescription>
-          </CardHeader>
-          
-          {renderStep()}
-        </Card>
+        {renderStep()}
         
-        <div className="text-center">
-          <a href="/admin/login" className="text-blue-600 hover:text-blue-800 text-sm">
+        <div className="text-center p-4 border-t">
+          <p className="text-xs text-gray-500 mb-2">
+            Need super admin access?
+          </p>
+          <a 
+            href="/admin/login" 
+            className="text-xs text-blue-600 hover:text-blue-800"
+          >
             Super Admin Login →
           </a>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }
