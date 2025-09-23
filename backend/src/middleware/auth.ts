@@ -21,7 +21,7 @@ export const authenticateToken = async (req: Request, res: Response, next: NextF
     const { data: user, error } = await supabase
       .from('users')
       .select('*')
-      .eq('id', decoded.userId)
+      .eq('id', decoded.user?.id || decoded.userId)
       .single();
 
     if (error || !user) {

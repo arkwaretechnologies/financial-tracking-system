@@ -13,12 +13,13 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Trash2, Edit, Plus, Users as UsersIcon } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { api } from '@/lib/api';
 
 interface ClientUser {
   id: string;
   email: string;
   name: string;
-  role: 'admin' | 'user';
+  role: 'admin' | 'client_user';
   store_id: string;
   store_name: string;
   created_at: string;
@@ -33,14 +34,15 @@ interface Role {
 }
 
 export default function ClientUsersPage() {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const [users, setUsers] = useState<ClientUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [newUser, setNewUser] = useState({
     email: '',
     name: '',
-    role: 'user' as 'admin' | 'user',
-    store_id: ''
+    role: 'client_user' as 'admin' | 'client_user',
+    store_id: '',
+    password: ''
   });
   const [editingUser, setEditingUser] = useState<ClientUser | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -85,70 +87,95 @@ export default function ClientUsersPage() {
     { id: '3', name: 'Warehouse' },
   ];
 
-  // Mock users data for the current client
+  // Fetch real users data from the backend API
   useEffect(() => {
-    const mockUsers: ClientUser[] = [
-      {
-        id: '1',
-        email: 'john.doe@testcorp.com',
-        name: 'John Doe',
-        role: 'admin',
-        store_id: '1',
-        store_name: 'Main Store',
-        created_at: '2024-01-15',
-        status: 'active'
-      },
-      {
-        id: '2',
-        email: 'jane.smith@testcorp.com',
-        name: 'Jane Smith',
-        role: 'user',
-        store_id: '2',
-        store_name: 'Downtown Branch',
-        created_at: '2024-01-20',
-        status: 'active'
-      },
-      {
-        id: '3',
-        email: 'mike.wilson@testcorp.com',
-        name: 'Mike Wilson',
-        role: 'user',
-        store_id: '1',
-        store_name: 'Main Store',
-        created_at: '2024-02-01',
-        status: 'inactive'
-      },
-      {
-        id: '4',
-        email: 'sarah.johnson@testcorp.com',
-        name: 'Sarah Johnson',
-        role: 'user',
-        store_id: '3',
-        store_name: 'Warehouse',
-        created_at: '2024-02-10',
-        status: 'active'
+    const fetchUsers = async () => {
+      try {
+        console.log('Fetching users - Token available:', !!token);
+        console.log('Fetching users - Token value:', token ? token.substring(0, 10) + '...' : 'null');
+        console.log('Fetching users - User available:', !!user);
+        console.log('Fetching users - Client ID:', user?.client_id);
+        
+        if (!token) {
+          console.error('No authentication token found');
+          setLoading(false);
+          return;
+        }
+
+        if (!user?.client_id) {
+          console.error('No client ID found for logged-in user');
+          setLoading(false);
+          return;
+        }
+
+        const response = await api.getUsersByClient(token, user.client_id);
+        
+        // Transform backend user data to match our ClientUser interface
+        const transformedUsers: ClientUser[] = response.users.map((user: any) => ({
+          id: user.id,
+          email: user.email,
+          name: user.username, // Using username as name since backend doesn't have separate name field
+          role: user.role === 'super_admin' ? 'admin' : 'client_user',
+          store_id: user.store_id || '1', // Default store if not provided
+          store_name: user.store_name || 'Main Store', // Default store name
+          created_at: user.created_at?.split('T')[0] || new Date().toISOString().split('T')[0],
+          status: user.is_active !== false ? 'active' : 'inactive' // Default to active if not specified
+        }));
+
+        setUsers(transformedUsers);
+        setLoading(false);
+      } catch (error) {
+        console.error('Error fetching users:', error);
+        console.error('Error details:', {
+          message: error instanceof Error ? error.message : 'Unknown error',
+          tokenAvailable: !!token,
+          clientIdAvailable: !!user?.client_id,
+          tokenLength: token?.length
+        });
+        setLoading(false);
       }
-    ];
-
-    setUsers(mockUsers);
-    setLoading(false);
-  }, []);
-
-  const handleAddUser = () => {
-    const user: ClientUser = {
-      id: Date.now().toString(),
-      email: newUser.email,
-      name: newUser.name,
-      role: newUser.role,
-      store_id: newUser.store_id,
-      store_name: clientStores.find(s => s.id === newUser.store_id)?.name || '',
-      created_at: new Date().toISOString().split('T')[0],
-      status: 'active'
     };
 
-    setUsers([...users, user]);
-    setNewUser({ email: '', name: '', role: 'user', store_id: '' });
-    setIsAddDialogOpen(false);
+    fetchUsers();
+  }, [user?.client_id, token]);
+
+  const handleAddUser = async () => {
+    try {
+      if (!token) {
+        console.error('No authentication token found');
+        return;
+      }
+
+      const userData = {
+        username: newUser.name,
+        email: newUser.email,
+        password: newUser.password,
+        role: newUser.role,
+        client_id: user?.client_id || '',
+        store_id: newUser.store_id || undefined
+      };
+
+      const response = await api.createUser(token, userData);
+      
+      // Create new user object for local state
+      const newUserObj: ClientUser = {
+        id: response.user.id,
+        email: response.user.email,
+        name: response.user.username,
+        role: response.user.role === 'super_admin' ? 'admin' : 'client_user',
+        store_id: response.user.store_id || '1',
+        store_name: clientStores.find(s => s.id === (response.user.store_id || '1'))?.name || 'Main Store',
+        created_at: response.user.created_at?.split('T')[0] || new Date().toISOString().split('T')[0],
+        status: 'active'
+      };
+
+      setUsers([...users, newUserObj]);
+      setNewUser({ email: '', name: '', role: 'client_user', store_id: '', password: '' });
+      setIsAddDialogOpen(false);
+    } catch (error) {
+      console.error('Error creating user:', error);
+      alert('Failed to create user. Please try again.');
+    }
   };
 
   const handleAddRole = () => {
@@ -269,14 +296,24 @@ export default function ClientUsersPage() {
                 />
               </div>
               <div className="grid gap-2">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={newUser.password}
+                  onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                  placeholder="Enter password"
+                />
+              </div>
+              <div className="grid gap-2">
                 <Label htmlFor="role">Role</Label>
-                <Select value={newUser.role} onValueChange={(value: 'admin' | 'user') => setNewUser({ ...newUser, role: value })}>
+                <Select value={newUser.role} onValueChange={(value: 'admin' | 'client_user') => setNewUser({ ...newUser, role: value })}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="user">User</SelectItem>
+                    <SelectItem value="client_user">Client User</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -340,7 +377,7 @@ export default function ClientUsersPage() {
             <UsersIcon className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{users.filter(u => u.role === 'user').length}</div>
+            <div className="text-2xl font-bold">{users.filter(u => u.role === 'client_user').length}</div>
           </CardContent>
         </Card>
       </div>
@@ -378,7 +415,7 @@ export default function ClientUsersPage() {
                       <TableCell>{user.email}</TableCell>
                       <TableCell>
                         <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
-                          {user.role}
+                          {user.role === 'admin' ? 'Admin' : 'Client User'}
                         </Badge>
                       </TableCell>
                       <TableCell>{user.store_name || 'All Stores'}</TableCell>
@@ -724,14 +761,14 @@ export default function ClientUsersPage() {
                 <Label htmlFor="edit-role">Role</Label>
                 <Select
                   value={editingUser.role}
-                  onValueChange={(value: 'admin' | 'user') => setEditingUser({ ...editingUser, role: value })}
+                  onValueChange={(value: 'admin' | 'client_user') => setEditingUser({ ...editingUser, role: value })}
                 >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="user">User</SelectItem>
+                    <SelectItem value="client_user">Client User</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

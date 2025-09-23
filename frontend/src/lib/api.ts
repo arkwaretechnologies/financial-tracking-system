@@ -45,6 +45,31 @@ interface ApiError {
   error: string;
 }
 
+interface User {
+  id: string;
+  username: string;
+  email: string;
+  role: 'super_admin' | 'admin' | 'client_user';
+  client_id: string;
+  created_at: string;
+  first_name?: string;
+  last_name?: string;
+  store_id?: string;
+  is_active?: boolean;
+}
+
+interface CreateUserRequest {
+  username: string;
+  email: string;
+  password: string;
+  role: 'admin' | 'client_user';
+  client_id: string;
+  first_name?: string;
+  last_name?: string;
+  store_id?: string;
+  is_active?: boolean;
+}
+
 class ApiClient {
   private baseUrl: string;
 
@@ -95,6 +120,32 @@ class ApiClient {
       headers: {
         Authorization: `Bearer ${token}`,
       },
+    });
+  }
+
+  async getUsers(token: string): Promise<{ users: User[] }> {
+    return this.request<{ users: User[] }>('/users', {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+  }
+
+  async getUsersByClient(token: string, clientId: string): Promise<{ users: User[] }> {
+    return this.request<{ users: User[] }>(`/users/client/${clientId}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+  }
+
+  async createUser(token: string, userData: CreateUserRequest): Promise<{ user: User; message: string }> {
+    return this.request<{ user: User; message: string }>('/users', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(userData),
     });
   }
 }
