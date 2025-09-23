@@ -2,22 +2,30 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { api } from '@/lib/api';
 
 interface User {
   id: string;
-  email: string;
+  username: string;
+  email?: string;
   role: 'admin' | 'client_user';
   client_id: string;
+  first_name?: string;
+  last_name?: string;
+  created_at: string;
   client_name: string;
+  client_email?: string;
+  client_phone?: string;
+  client_address?: string;
+  client_created_at: string;
   store_id?: string;
   store_name?: string;
-  created_at: string;
 }
 
 interface AuthContextType {
   user: User | null;
   token: string | null;
-  login: (clientId: string, role: 'admin' | 'client_user', rolePassword: string) => Promise<void>;
+  login: (clientId: string, usernameOrEmail: string, password: string) => Promise<void>;
   logout: () => void;
   loading: boolean;
 }
@@ -43,65 +51,70 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(false);
   }, []);
 
-  const login = async (clientId: string, role: 'admin' | 'client_user', rolePassword: string) => {
+  const login = async (clientId: string, usernameOrEmail: string, password: string): Promise<void> => {
     try {
-      // Mock client data based on client ID
-      const mockClients = {
-        '12345': { name: 'Test Corporation', adminPassword: 'admin123', userPassword: 'user123' },
-        'CLIENT001': { name: 'ABC Corporation', adminPassword: 'admin123', userPassword: 'user123' },
-        'CLIENT002': { name: 'XYZ Industries', adminPassword: 'admin456', userPassword: 'user456' },
-        'CLIENT003': { name: 'Demo Client', adminPassword: 'demo123', userPassword: 'demo123' }
+      setLoading(true);
+      
+      // Prepare login request data with proper typing
+      const loginData: any = {
+        client_id: clientId,
+        password: password
       };
-
-      const clientData = mockClients[clientId as keyof typeof mockClients];
       
-      if (!clientData) {
-        throw new Error('Invalid Client ID');
-      }
-
-      // Validate role password
-      const expectedPassword = role === 'admin' ? clientData.adminPassword : clientData.userPassword;
-      if (rolePassword !== expectedPassword) {
-        throw new Error('Invalid role password');
-      }
-
-      let userData: User;
-      
-      if (role === 'admin') {
-        userData = {
-          id: 'admin_' + Date.now(),
-          email: `admin@${clientId.toLowerCase()}.com`,
-          role: 'admin',
-          client_id: clientId,
-          client_name: clientData.name,
-          created_at: new Date().toISOString()
-        };
+      // Determine if usernameOrEmail is an email or username
+      const isEmail = usernameOrEmail.includes('@');
+      if (isEmail) {
+        loginData.email = usernameOrEmail;
       } else {
-        userData = {
-          id: 'user_' + Date.now(),
-          email: `user@${clientId.toLowerCase()}.com`,
-          role: 'client_user',
-          client_id: clientId,
-          client_name: clientData.name,
-          store_id: 'STORE001', // Default store for regular users
-          store_name: 'Main Store',
-          created_at: new Date().toISOString()
-        };
+        loginData.username = usernameOrEmail;
       }
-
-      const token = 'client_token_' + Date.now();
-
-      setToken(token);
-      setUser(userData);
       
-      // Store in localStorage
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(userData));
+      // Call backend API
+      const response = await api.login(loginData);
+      
+      // Validate response data
+      if (!response.user || !response.token) {
+        throw new Error('Invalid response from authentication server');
+      }
+      
+      // Map backend role to frontend role with fallback
+      const userRole = response.user.role === 'admin' ? 'admin' : 'client_user';
+      
+      const userData: User = {
+        id: response.user.id,
+        client_id: response.user.client_id,
+        username: response.user.username,
+        email: response.user.email || undefined,
+        role: userRole,
+        first_name: response.user.first_name || undefined,
+        last_name: response.user.last_name || undefined,
+        created_at: response.user.created_at,
+        client_name: response.user.client_name,
+        client_email: response.user.client_email || undefined,
+        client_phone: response.user.client_phone || undefined,
+        client_address: response.user.client_address || undefined,
+        client_created_at: response.user.client_created_at,
+        store_id: response.user.store_id || undefined,
+        store_name: response.user.store_name || undefined
+      };
+      
+      setUser(userData);
+      setToken(response.token);
+      
+      // Safely store in localStorage with error handling
+      try {
+        localStorage.setItem('token', response.token);
+        localStorage.setItem('user', JSON.stringify(userData));
+      } catch (storageError) {
+        console.warn('Failed to store authentication data in localStorage:', storageError);
+      }
       
       // Redirect to dashboard
       router.push('/dashboard');
     } catch (error) {
       throw new Error(error instanceof Error ? error.message : 'Authentication failed');
+    } finally {
+      setLoading(false);
     }
   };
 

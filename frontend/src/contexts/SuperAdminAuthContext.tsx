@@ -2,10 +2,12 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { api } from '@/lib/api';
 
 interface SuperAdmin {
   id: string;
-  email: string;
+  username: string;
+  email?: string;
   role: 'super_admin';
   created_at: string;
 }
@@ -13,7 +15,7 @@ interface SuperAdmin {
 interface SuperAdminAuthContextType {
   superAdmin: SuperAdmin | null;
   token: string | null;
-  login: (email: string, password: string) => Promise<void>;
+  login: (username: string, password: string) => Promise<void>;
   logout: () => void;
   loading: boolean;
 }
@@ -39,14 +41,14 @@ export function SuperAdminAuthProvider({ children }: { children: React.ReactNode
     setLoading(false);
   }, []);
 
-  const login = async (email: string, password: string) => {
+  const login = async (username: string, password: string) => {
     try {
       // For demo purposes, accept specific super admin credentials
       // In production, this would validate against backend
-      if (email === 'superadmin@fts.com' && password === 'admin123') {
+      if (username === 'superadmin' && password === 'admin123') {
         const superAdminData: SuperAdmin = {
           id: 'super_admin_' + Date.now(),
-          email: email,
+          username: username,
           role: 'super_admin',
           created_at: new Date().toISOString()
         };

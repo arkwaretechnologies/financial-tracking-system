@@ -13,7 +13,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 
 interface User {
   id: string;
-  email: string;
+  username: string;
+  email?: string;
   name: string;
   role: 'admin' | 'user';
   client_id: string;
@@ -28,7 +29,7 @@ export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [newUser, setNewUser] = useState({ 
-    email: '', 
+    username: '', 
     name: '', 
     role: 'user' as 'admin' | 'user',
     client_id: '', 
@@ -60,7 +61,7 @@ export default function UsersPage() {
       const mockUsers: User[] = [
         {
           id: '1',
-          email: 'admin@example.com',
+          username: 'admin',
           name: 'System Administrator',
           role: 'admin',
           client_id: '00000000-0000-0000-0000-000000000001',
@@ -69,7 +70,7 @@ export default function UsersPage() {
         },
         {
           id: '2',
-          email: 'user1@sample1.com',
+          username: 'user1',
           name: 'John Doe',
           role: 'user',
           client_id: '11111111-1111-1111-1111-111111111111',
@@ -80,7 +81,7 @@ export default function UsersPage() {
         },
         {
           id: '3',
-          email: 'user2@sample1.com',
+          username: 'user2',
           name: 'Jane Smith',
           role: 'user',
           client_id: '11111111-1111-1111-1111-111111111111',
@@ -91,7 +92,7 @@ export default function UsersPage() {
         },
         {
           id: '4',
-          email: 'user1@sample2.com',
+          username: 'user3',
           name: 'Bob Johnson',
           role: 'user',
           client_id: '22222222-2222-2222-2222-222222222222',
@@ -110,7 +111,7 @@ export default function UsersPage() {
   };
 
   const handleCreateUser = async () => {
-    if (!newUser.email.trim() || !newUser.name.trim() || !newUser.client_id.trim()) return;
+    if (!newUser.username.trim() || !newUser.name.trim() || !newUser.client_id.trim()) return;
 
     try {
       const client = clients.find(c => c.id === newUser.client_id);
@@ -118,7 +119,7 @@ export default function UsersPage() {
       
       const user: User = {
         id: Date.now().toString(),
-        email: newUser.email,
+        username: newUser.username,
         name: newUser.name,
         role: newUser.role,
         client_id: newUser.client_id,
@@ -129,7 +130,7 @@ export default function UsersPage() {
       };
       
       setUsers([...users, user]);
-      setNewUser({ email: '', name: '', role: 'user', client_id: '', store_id: '' });
+      setNewUser({ username: '', name: '', role: 'user', client_id: '', store_id: '' });
       setIsDialogOpen(false);
     } catch (error) {
       console.error('Error creating user:', error);
@@ -182,11 +183,11 @@ export default function UsersPage() {
                 </Label>
                 <Input
                   id="email"
-                  type="email"
-                  value={newUser.email}
-                  onChange={(e) => setNewUser({...newUser, email: e.target.value})}
+                  type="text"
+                  value={newUser.username}
+                  onChange={(e) => setNewUser({...newUser, username: e.target.value})}
                   className="col-span-3"
-                  placeholder="Enter email address"
+                  placeholder="Enter username or email"
                 />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
@@ -258,7 +259,7 @@ export default function UsersPage() {
               <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleCreateUser} disabled={!newUser.email.trim() || !newUser.name.trim() || !newUser.client_id.trim()}>
+              <Button onClick={handleCreateUser} disabled={!newUser.username.trim() || !newUser.name.trim() || !newUser.client_id.trim()}>
                 Create User
               </Button>
             </DialogFooter>

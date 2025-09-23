@@ -10,7 +10,7 @@ router.get('/', authenticateToken as any, requireRole(['super_admin', 'admin']),
     
     const { data: users, error } = await supabase
       .from('users')
-      .select('id, email, role, client_id, created_at')
+      .select('id, username, email, role, client_id, created_at')
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -35,7 +35,7 @@ router.get('/client/:clientId', authenticateToken as any, requireRole(['super_ad
 
     const { data: users, error } = await supabase
       .from('users')
-      .select('id, email, role, client_id, created_at')
+      .select('id, username, email, role, client_id, created_at')
       .eq('client_id', clientId)
       .order('created_at', { ascending: false });
 
@@ -51,10 +51,10 @@ router.get('/client/:clientId', authenticateToken as any, requireRole(['super_ad
 // Create user (Admin and Super Admin)
 router.post('/', authenticateToken as any, requireRole(['super_admin', 'admin']), async (req: any, res) => {
   try {
-    const { email, password, role, client_id } = req.body;
+    const { username, email, password, role, client_id } = req.body;
 
-    if (!email || !password || !role || !client_id) {
-      return res.status(400).json({ error: 'All fields are required' });
+    if (!username || !email || !password || !role || !client_id) {
+      return res.status(400).json({ error: 'Username, email, password, role, and client_id are required' });
     }
 
     // Check permissions
@@ -74,17 +74,18 @@ router.post('/', authenticateToken as any, requireRole(['super_admin', 'admin'])
     const { data: user, error } = await supabase
       .from('users')
       .insert([{
+        username,
         email,
         password: hashedPassword,
         role,
         client_id
       }])
-      .select('id, email, role, client_id, created_at')
+      .select('id, username, email, role, client_id, created_at')
       .single();
 
     if (error) {
       if (error.code === '23505') { // Unique violation
-        return res.status(409).json({ error: 'User already exists' });
+        return res.status(409).json({ error: 'Username or email already exists' });
       }
       throw error;
     }

@@ -8,13 +8,17 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { api } from '@/lib/api';
 
 type LoginStep = 'clientId' | 'roleSelection' | 'rolePassword';
 
 export default function LoginPage() {
   const [step, setStep] = useState<LoginStep>('clientId');
   const [clientId, setClientId] = useState('');
-  const [selectedRole, setSelectedRole] = useState<'admin' | 'client_user'>('admin');
+  const [clientName, setClientName] = useState('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [selectedRole, setSelectedRole] = useState<'admin' | 'client_user'>('client_user');
   const [rolePassword, setRolePassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -23,21 +27,38 @@ export default function LoginPage() {
   const handleClientIdSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setLoading(true);
     
-    // Validate client ID exists
-    const mockClients = {
-      '12345': { name: 'Test Corporation', adminPassword: 'admin123', userPassword: 'user123' },
-      'CLIENT001': { name: 'ABC Corporation', adminPassword: 'admin123', userPassword: 'user123' },
-      'CLIENT002': { name: 'XYZ Industries', adminPassword: 'admin456', userPassword: 'user456' },
-      'CLIENT003': { name: 'Demo Client', adminPassword: 'demo123', userPassword: 'demo123' }
-    };
-
-    if (!mockClients[clientId as keyof typeof mockClients]) {
-      setError('Invalid Client ID');
+    // Basic validation
+    if (!clientId || clientId.length < 3) {
+      setError('Client ID must be at least 3 characters');
+      setLoading(false);
       return;
     }
     
-    setStep('roleSelection');
+    try {
+      // Validate client ID against database
+      const response = await api.validateClient(clientId);
+      
+      if (response.valid) {
+        setClientName(response.clients?.name || '');
+        setStep('roleSelection');
+      } else {
+        setError('Client not found');
+      }
+    } catch (err) {
+      if (err instanceof Error) {
+        if (err.message.includes('404')) {
+          setError('Client not found');
+        } else {
+          setError('Failed to validate client. Please try again.');
+        }
+      } else {
+        setError('An unexpected error occurred');
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleRoleSelection = (role: 'admin' | 'client_user') => {
@@ -51,7 +72,8 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      await login(clientId, selectedRole, rolePassword);
+      // Use username as the login credential
+      await login(clientId, username, rolePassword);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
       setLoading(false);
@@ -84,8 +106,8 @@ export default function LoginPage() {
             </CardContent>
             
             <CardFooter>
-              <Button type="submit" className="w-full">
-                Continue
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? 'Validating...' : 'Continue'}
               </Button>
             </CardFooter>
           </form>
@@ -97,6 +119,9 @@ export default function LoginPage() {
             <CardContent className="space-y-4">
               <div className="text-center">
                 <p className="text-sm text-gray-600">Client ID: {clientId}</p>
+                {clientName && (
+                  <p className="text-sm text-gray-500 font-medium">{clientName}</p>
+                )}
                 <button 
                   onClick={() => setStep('clientId')}
                   className="text-blue-600 hover:text-blue-800 text-xs"
@@ -141,6 +166,9 @@ export default function LoginPage() {
               
               <div className="text-center">
                 <p className="text-sm text-gray-600">Client ID: {clientId}</p>
+                {clientName && (
+                  <p className="text-sm text-gray-500 font-medium">{clientName}</p>
+                )}
                 <p className="text-sm text-gray-600">Role: {selectedRole === 'admin' ? 'Admin' : 'User'}</p>
                 <button 
                   onClick={() => setStep('roleSelection')}
@@ -148,6 +176,18 @@ export default function LoginPage() {
                 >
                   ← Change Role
                 </button>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="username">Username</Label>
+                <Input
+                  id="username"
+                  type="text"
+                  placeholder="Enter your username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                />
               </div>
               
               <div className="space-y-2">
@@ -162,11 +202,11 @@ export default function LoginPage() {
                 />
               </div>
               
-              <div className="text-xs text-gray-500 bg-gray-50 p-3 rounded">
+              {/* <div className="text-xs text-gray-500 bg-gray-50 p-3 rounded">
                 <p className="font-medium mb-1">Demo Credentials:</p>
                 <p>• Admin password: admin123 (for CLIENT001)</p>
                 <p>• User password: user123 (for CLIENT001)</p>
-              </div>
+              </div> */}
             </CardContent>
             
             <CardFooter>
