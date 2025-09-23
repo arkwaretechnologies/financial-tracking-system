@@ -522,7 +522,7 @@ export default function ClientUsersPage() {
                 {pageGroups.map(group => (
                   <div key={group.label} className="p-4 border rounded-lg">
                     <div className="flex justify-between items-center mb-2">
-                      <h4 className="font-medium">{group.label}</h4>
+                      <h4 className="font-medium mr-2">{group.label}</h4>
                       <div className="flex gap-2">
                         <Button
                           variant="link"
@@ -628,7 +628,7 @@ export default function ClientUsersPage() {
                   {pageGroups.map(group => (
                     <div key={group.label} className="p-4 border rounded-lg">
                       <div className="flex justify-between items-center mb-2">
-                        <h4 className="font-medium">{group.label}</h4>
+                        <h4 className="font-medium mr-2">{group.label}</h4>
                         <div className="flex gap-2">
                           <Button
                             variant="link"
