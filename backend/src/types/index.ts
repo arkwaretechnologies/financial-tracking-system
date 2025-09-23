@@ -1,5 +1,6 @@
 export interface User {
   id: string;
+  username: string;
   email: string;
   role: 'super_admin' | 'admin' | 'client_user';
   client_id?: string;
@@ -36,11 +37,13 @@ export interface AuthRequest extends Request {
 
 export interface LoginRequest {
   client_id: string;
-  email: string;
+  email?: string;
+  username?: string;
   password: string;
 }
 
 export interface CreateUserRequest {
+  username: string;
   email: string;
   password: string;
   role: 'admin' | 'client_user';

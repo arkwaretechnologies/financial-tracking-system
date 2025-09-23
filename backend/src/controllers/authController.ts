@@ -6,16 +6,16 @@ import { LoginRequest } from '../types';
 
 export const login = async (req: Request, res: Response) => {
   try {
-    const { client_id, email, password }: LoginRequest = req.body;
+    const { client_id, username, email, password }: LoginRequest & { username?: string } = req.body;
 
-    if (!client_id || !email || !password) {
-      return res.status(400).json({ error: 'Client ID, email, and password are required' });
+    if (!client_id || !password || (!username && !email)) {
+      return res.status(400).json({ error: 'Client ID, password, and either username or email are required' });
     }
 
-    // First, verify the client exists
+    // First, verify the client exists and get client data
     const { data: client, error: clientError } = await supabase
       .from('clients')
-      .select('id')
+      .select('id, name, contact_email, contact_phone, address, created_at')
       .eq('id', client_id)
       .single();
 
@@ -23,13 +23,19 @@ export const login = async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Client not found' });
     }
 
-    // Find user by email and client_id
-    const { data: user, error: userError } = await supabase
+    // Find user by username/email and client_id
+    let userQuery = supabase
       .from('users')
       .select('*')
-      .eq('email', email)
-      .eq('client_id', client_id)
-      .single();
+      .eq('client_id', client_id);
+
+    if (username) {
+      userQuery = userQuery.eq('username', username);
+    } else if (email) {
+      userQuery = userQuery.eq('email', email);
+    }
+
+    const { data: user, error: userError } = await userQuery.single();
 
     if (userError || !user) {
       return res.status(401).json({ error: 'Invalid credentials' });
@@ -46,6 +52,7 @@ export const login = async (req: Request, res: Response) => {
       { 
         user: {
           id: user.id,
+          username: user.username,
           email: user.email,
           role: user.role,
           client_id: user.client_id
@@ -60,7 +67,14 @@ export const login = async (req: Request, res: Response) => {
 
     res.json({
       token,
-      user: userWithoutPassword,
+      user: {
+        ...userWithoutPassword,
+        client_name: client.name,
+        client_email: client.contact_email,
+        client_phone: client.contact_phone,
+        client_address: client.address,
+        client_created_at: client.created_at
+      },
       message: 'Login successful'
     });
 
@@ -72,10 +86,10 @@ export const login = async (req: Request, res: Response) => {
 
 export const register = async (req: Request, res: Response) => {
   try {
-    const { email, password, role, client_id } = req.body;
+    const { username, email, password, role, client_id } = req.body;
 
-    if (!email || !password || !role || !client_id) {
-      return res.status(400).json({ error: 'All fields are required' });
+    if (!username || !email || !password || !role || !client_id) {
+      return res.status(400).json({ error: 'Username, email, password, role, and client_id are required' });
     }
 
     // Hash password
@@ -85,6 +99,7 @@ export const register = async (req: Request, res: Response) => {
     const { data: user, error } = await supabase
       .from('users')
       .insert([{
+        username,
         email,
         password: hashedPassword,
         role,
@@ -95,7 +110,7 @@ export const register = async (req: Request, res: Response) => {
 
     if (error) {
       if (error.code === '23505') { // Unique violation
-        return res.status(409).json({ error: 'User already exists' });
+        return res.status(409).json({ error: 'Username or email already exists' });
       }
       throw error;
     }
@@ -114,13 +129,50 @@ export const register = async (req: Request, res: Response) => {
   }
 };
 
+export const validateClient = async (req: Request, res: Response) => {
+  try {
+    const { client_id } = req.body;
+
+    if (!client_id) {
+      return res.status(400).json({ error: 'Client ID is required' });
+    }
+
+    // Check if client exists in the database
+    const { data: client, error } = await supabase
+      .from('clients')
+      .select('id, name, contact_email, contact_phone, address, created_at')
+      .eq('id', client_id)
+      .single();
+
+    if (error || !client) {
+      return res.status(404).json({ error: 'Client not found' });
+    }
+
+    res.json({ 
+      valid: true, 
+      client: {
+        id: client.id,
+        name: client.name,
+        email: client.contact_email,
+        phone: client.contact_phone,
+        address: client.address,
+        created_at: client.created_at
+      }
+    });
+
+  } catch (error) {
+    console.error('Client validation error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 export const me = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
 
     const { data: user, error } = await supabase
       .from('users')
-      .select('id, email, role, client_id, created_at')
+      .select('id, username, email, role, client_id, first_name, last_name, created_at')
       .eq('id', userId)
       .single();
 

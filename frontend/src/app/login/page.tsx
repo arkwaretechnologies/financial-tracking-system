@@ -8,12 +8,18 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { api } from '@/lib/api';
 
 type LoginStep = 'clientId' | 'userLogin';
 
 export default function LoginPage() {
   const [step, setStep] = useState<LoginStep>('clientId');
   const [clientId, setClientId] = useState('');
+  const [clientName, setClientName] = useState('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [selectedRole, setSelectedRole] = useState<'admin' | 'client_user'>('client_user');
+  const [rolePassword, setRolePassword] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -23,6 +29,12 @@ export default function LoginPage() {
   const handleClientIdSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setLoading(true);
+    
+    // Basic validation
+    if (!clientId || clientId.length < 3) {
+      setError('Client ID must be at least 3 characters');
+      setLoading(false);
     
     // Validate client ID exists
     const mockClients = {
@@ -79,8 +91,8 @@ export default function LoginPage() {
             </CardContent>
             
             <CardFooter>
-              <Button type="submit" className="w-full">
-                Continue
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? 'Validating...' : 'Continue'}
               </Button>
             </CardFooter>
           </form>
@@ -98,6 +110,9 @@ export default function LoginPage() {
               
               <div className="text-center">
                 <p className="text-sm text-gray-600">Client ID: {clientId}</p>
+                {clientName && (
+                  <p className="text-sm text-gray-500 font-medium">{clientName}</p>
+                )}
                 <button 
                   onClick={() => setStep('clientId')}
                   className="text-blue-600 hover:text-blue-800 text-xs"
@@ -107,6 +122,51 @@ export default function LoginPage() {
               </div>
               
               <div className="space-y-2">
+                <Label>Select Your Role</Label>
+                <RadioGroup value={selectedRole} onValueChange={(value) => handleRoleSelection(value as 'admin' | 'client_user')}>
+                  <div className="flex items-center space-x-2 p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                    <RadioGroupItem value="admin" id="admin" />
+                    <Label htmlFor="admin" className="cursor-pointer flex-1">
+                      <div className="font-medium">Admin</div>
+                      <div className="text-sm text-gray-500">Full access to manage stores, users, and all transactions</div>
+                    </Label>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2 p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                    <RadioGroupItem value="client_user" id="client_user" />
+                    <Label htmlFor="client_user" className="cursor-pointer flex-1">
+                      <div className="font-medium">User</div>
+                      <div className="text-sm text-gray-500">Access to record transactions and view reports</div>
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </div>
+            </CardContent>
+          </>
+        );
+
+      case 'rolePassword':
+        return (
+          <form onSubmit={handleRolePasswordSubmit}>
+            <CardContent className="space-y-4">
+              {error && (
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+              
+              <div className="text-center">
+                <p className="text-sm text-gray-600">Client ID: {clientId}</p>
+                {clientName && (
+                  <p className="text-sm text-gray-500 font-medium">{clientName}</p>
+                )}
+                <p className="text-sm text-gray-600">Role: {selectedRole === 'admin' ? 'Admin' : 'User'}</p>
+                <button 
+                  onClick={() => setStep('roleSelection')}
+                  className="text-blue-600 hover:text-blue-800 text-xs"
+                >
+                  ← Change Role
+                </button>
                 <Label htmlFor="username">Username/Email</Label>
                 <Input
                   id="username"
@@ -130,6 +190,11 @@ export default function LoginPage() {
                 />
               </div>
               
+              {/* <div className="text-xs text-gray-500 bg-gray-50 p-3 rounded">
+                <p className="font-medium mb-1">Demo Credentials:</p>
+                <p>• Admin password: admin123 (for CLIENT001)</p>
+                <p>• User password: user123 (for CLIENT001)</p>
+              </div> */}
               <div className="text-xs text-gray-500 bg-gray-50 p-3 rounded">
                 <p className="font-medium mb-1">Demo Credentials for {clientId}:</p>
                 {clientId === '12345' && (

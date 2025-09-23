@@ -50,6 +50,47 @@ export default function DashboardPage() {
         <p className="text-gray-600">Welcome back, {user?.client_name}</p>
         <p className="text-sm text-gray-500">Role: {user?.role === 'admin' ? 'Admin' : 'User'}</p>
         {user?.store_name && <p className="text-sm text-gray-500">Store: {user.store_name}</p>}
+        
+        {/* Client Information Card */}
+        {user && (
+          <Card className="mt-4 bg-blue-50">
+            <CardHeader>
+              <CardTitle className="text-lg">Client Information</CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Client Name</p>
+                <p className="text-sm text-gray-900">{user.client_name}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-600">Client ID</p>
+                <p className="text-sm text-gray-900">{user.client_id}</p>
+              </div>
+              {user.client_email && (
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Client Email</p>
+                  <p className="text-sm text-gray-900">{user.client_email}</p>
+                </div>
+              )}
+              {user.client_phone && (
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Client Phone</p>
+                  <p className="text-sm text-gray-900">{user.client_phone}</p>
+                </div>
+              )}
+              {user.client_address && (
+                <div className="md:col-span-2">
+                  <p className="text-sm font-medium text-gray-600">Client Address</p>
+                  <p className="text-sm text-gray-900">{user.client_address}</p>
+                </div>
+              )}
+              <div>
+                <p className="text-sm font-medium text-gray-600">Account Created</p>
+                <p className="text-sm text-gray-900">{new Date(user.client_created_at).toLocaleDateString()}</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

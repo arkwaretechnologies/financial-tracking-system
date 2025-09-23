@@ -51,6 +51,7 @@ CREATE TABLE stores (
 -- Enhanced users table
 CREATE TABLE users (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    username TEXT UNIQUE NOT NULL,
     email TEXT UNIQUE NOT NULL,
     password TEXT NOT NULL, -- This will store hashed passwords
     role user_role NOT NULL,
@@ -135,6 +136,7 @@ CREATE TABLE password_reset_tokens (
 );
 
 -- Create indexes for better performance
+CREATE INDEX idx_users_username ON users(username);
 CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_users_client_id ON users(client_id);
 CREATE INDEX idx_users_store_id ON users(store_id);
@@ -253,6 +255,17 @@ CREATE POLICY "Admins can manage stores for their client" ON stores
 -- Users policies
 CREATE POLICY "Users can view their own profile" ON users
     FOR SELECT TO authenticated
+    USING (
+        id = auth.uid() OR 
+        EXISTS (
+            SELECT 1 FROM users u
+            WHERE u.id = auth.uid() 
+            AND u.role IN ('super_admin', 'admin')
+        )
+    );
+
+CREATE POLICY "Users can update their own profile" ON users
+    FOR UPDATE TO authenticated
     USING (id = auth.uid());
 
 CREATE POLICY "Users can view users for their client" ON users
@@ -265,7 +278,12 @@ CREATE POLICY "Users can view users for their client" ON users
 CREATE POLICY "Admins can manage users for their client" ON users
     FOR ALL TO authenticated
     USING (
-        client_id = (SELECT client_id FROM users WHERE id = auth.uid() AND role IN ('admin', 'super_admin')) OR
+        EXISTS (
+            SELECT 1 FROM users u
+            WHERE u.id = auth.uid() 
+            AND u.role = 'admin'
+            AND u.client_id = users.client_id
+        ) OR
         EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'super_admin')
     );
 
@@ -319,15 +337,15 @@ CREATE POLICY "Users can manage their own sessions" ON user_sessions
 CREATE POLICY "Users can create reset tokens for themselves" ON password_reset_tokens
     FOR INSERT TO authenticated
     WITH CHECK (
-        EXISTS (SELECT 1 FROM users WHERE id = user_id AND email = auth.email())
+        user_id = auth.uid()
     );
 
 -- Insert default super admin user (password: 'admin123')
 INSERT INTO clients (id, name, contact_email, contact_phone, address) VALUES 
     ('00000000-0000-0000-0000-000000000001', 'System Admin', 'admin@fts.com', '+1234567890', 'System Administration');
 
-INSERT INTO users (id, email, password, role, first_name, last_name, client_id, is_active) VALUES 
-    ('00000000-0000-0000-0000-000000000001', 'superadmin@fts.com', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'super_admin', 'System', 'Administrator', '00000000-0000-0000-0000-000000000001', true);
+INSERT INTO users (id, username, email, password, role, first_name, last_name, client_id, is_active) VALUES 
+    ('00000000-0000-0000-0000-000000000001', 'superadmin', 'superadmin@fts.com', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'super_admin', 'System', 'Administrator', '00000000-0000-0000-0000-000000000001', true);
 
 -- Insert sample clients
 INSERT INTO clients (name, contact_email, contact_phone, address, industry) VALUES 
@@ -341,17 +359,17 @@ INSERT INTO stores (client_id, name, location, store_code, address, phone, email
     ((SELECT id FROM clients WHERE name = 'Sample Client 2'), 'Restaurant Location', 'City Center', 'R001', '456 Commerce Ave, Town', '+1234567895', 'restaurant@client2.com', '{"mon-thu": "11:00-22:00", "fri-sat": "11:00-23:00", "sun": "12:00-21:00"}');
 
 -- Insert sample users
-INSERT INTO users (email, password, role, first_name, last_name, client_id, store_id, is_active) VALUES 
-    ('admin@client1.com', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin', 'John', 'Admin', (SELECT id FROM clients WHERE name = 'Sample Client 1'), (SELECT id FROM stores WHERE store_code = 'C001'), true),
-    ('user@client1.com', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'client_user', 'Jane', 'User', (SELECT id FROM clients WHERE name = 'Sample Client 1'), (SELECT id FROM stores WHERE store_code = 'C002'), true),
-    ('manager@client2.com', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin', 'Bob', 'Manager', (SELECT id FROM clients WHERE name = 'Sample Client 2'), (SELECT id FROM stores WHERE store_code = 'R001'), true);
+INSERT INTO users (username, email, password, role, first_name, last_name, client_id, store_id, is_active) VALUES 
+    ('admin1', 'admin@client1.com', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin', 'John', 'Admin', (SELECT id FROM clients WHERE name = 'Sample Client 1'), (SELECT id FROM stores WHERE store_code = 'C001'), true),
+    ('user1', 'user@client1.com', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'client_user', 'Jane', 'User', (SELECT id FROM clients WHERE name = 'Sample Client 1'), (SELECT id FROM stores WHERE store_code = 'C002'), true),
+    ('manager1', 'manager@client2.com', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin', 'Bob', 'Manager', (SELECT id FROM clients WHERE name = 'Sample Client 2'), (SELECT id FROM stores WHERE store_code = 'R001'), true);
 
 -- Insert sample transactions
 INSERT INTO transactions (store_id, type, amount, category, subcategory, description, reference_number, payment_method, tax_amount, discount_amount, created_by, transaction_date) VALUES 
-    ((SELECT id FROM stores WHERE store_code = 'C001'), 'sale', 150.00, 'sales', 'electronics', 'Laptop sale', 'TXN001', 'credit_card', 12.00, 0.00, (SELECT id FROM users WHERE email = 'user@client1.com'), CURRENT_DATE - INTERVAL '2 days'),
-    ((SELECT id FROM stores WHERE store_code = 'C002'), 'sale', 75.50, 'sales', 'clothing', 'Winter jacket', 'TXN002', 'cash', 6.04, 5.00, (SELECT id FROM users WHERE email = 'user@client1.com'), CURRENT_DATE - INTERVAL '1 day'),
-    ((SELECT id FROM stores WHERE store_code = 'R001'), 'expense', 500.00, 'expenses', 'inventory', 'Food supplies', 'EXP001', 'bank_transfer', 0.00, 0.00, (SELECT id FROM users WHERE email = 'manager@client2.com'), CURRENT_DATE),
-    ((SELECT id FROM stores WHERE store_code = 'C001'), 'purchase', 1200.00, 'purchases', 'electronics', 'Inventory restock', 'PUR001', 'bank_transfer', 96.00, 0.00, (SELECT id FROM users WHERE email = 'admin@client1.com'), CURRENT_DATE - INTERVAL '3 days');
+    ((SELECT id FROM stores WHERE store_code = 'C001'), 'sale', 150.00, 'sales', 'electronics', 'Laptop sale', 'TXN001', 'credit_card', 12.00, 0.00, (SELECT id FROM users WHERE username = 'user1'), CURRENT_DATE - INTERVAL '2 days'),
+    ((SELECT id FROM stores WHERE store_code = 'C002'), 'sale', 75.50, 'sales', 'clothing', 'Winter jacket', 'TXN002', 'cash', 6.04, 5.00, (SELECT id FROM users WHERE username = 'user1'), CURRENT_DATE - INTERVAL '1 day'),
+    ((SELECT id FROM stores WHERE store_code = 'R001'), 'expense', 500.00, 'expenses', 'inventory', 'Food supplies', 'EXP001', 'bank_transfer', 0.00, 0.00, (SELECT id FROM users WHERE username = 'manager1'), CURRENT_DATE),
+    ((SELECT id FROM stores WHERE store_code = 'C001'), 'purchase', 1200.00, 'purchases', 'electronics', 'Inventory restock', 'PUR001', 'bank_transfer', 96.00, 0.00, (SELECT id FROM users WHERE username = 'admin1'), CURRENT_DATE - INTERVAL '3 days');
 
 -- Insert sample transaction items
 INSERT INTO transaction_items (transaction_id, item_name, quantity, unit_price, total_price, tax_rate, discount_rate) VALUES 
