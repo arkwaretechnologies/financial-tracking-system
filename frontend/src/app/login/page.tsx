@@ -116,6 +116,7 @@ export default function LoginPage() {
                   <p className="text-sm text-gray-500 font-medium">{clientName}</p>
                 )}
                 <button 
+                  type="button"
                   onClick={() => setStep('clientId')}
                   className="text-blue-600 hover:text-blue-800 text-xs"
                 >
