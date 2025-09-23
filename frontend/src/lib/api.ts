@@ -31,7 +31,7 @@ interface LoginResponse {
 
 interface ValidateClientResponse {
   valid: boolean;
-  clients: {
+  client: {
     id: string;
     name: string;
     contact_email?: string;
