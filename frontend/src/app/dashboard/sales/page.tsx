@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { FileUpload } from '@/components/ui/file-upload';
 
 interface Sale {
   id: string;
@@ -16,6 +17,7 @@ interface Sale {
   description: string;
   store_name: string;
   payment_method: 'cash' | 'card' | 'transfer';
+  document_image?: string;
 }
 
 export default function SalesPage() {
@@ -48,9 +50,9 @@ export default function SalesPage() {
   const [newSale, setNewSale] = useState({ 
     amount: '', 
     description: '', 
-    store_id: '', 
     payment_method: 'cash' as 'cash' | 'card' | 'transfer'
   });
+  const [saleDocument, setSaleDocument] = useState<File | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   // Mock stores data
@@ -61,21 +63,35 @@ export default function SalesPage() {
   ];
 
   const handleCreateSale = async () => {
-    if (!newSale.amount || !newSale.description.trim() || !newSale.store_id.trim()) return;
+    if (!newSale.amount || !newSale.description.trim()) return;
 
     try {
-      const store = stores.find(s => s.id === newSale.store_id);
+      // Use the first store as default (automatic store association)
+      const store = stores[0];
+      
+      // Convert image to base64 if available
+      let documentImageBase64 = '';
+      if (saleDocument) {
+        const reader = new FileReader();
+        documentImageBase64 = await new Promise((resolve) => {
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(saleDocument);
+        });
+      }
+      
       const sale: Sale = {
         id: Date.now().toString(),
         date: new Date().toISOString().split('T')[0],
         amount: parseFloat(newSale.amount),
         description: newSale.description,
         store_name: store?.name || 'Unknown',
-        payment_method: newSale.payment_method
+        payment_method: newSale.payment_method,
+        document_image: documentImageBase64 || undefined
       };
       
       setSales([sale, ...sales]);
-      setNewSale({ amount: '', description: '', store_id: '', payment_method: 'cash' });
+      setNewSale({ amount: '', description: '', payment_method: 'cash' });
+      setSaleDocument(null);
       setIsDialogOpen(false);
     } catch (error) {
       console.error('Error creating sale:', error);
@@ -131,23 +147,6 @@ export default function SalesPage() {
                 />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="store" className="text-right">
-                  Store
-                </Label>
-                <Select value={newSale.store_id} onValueChange={(value) => setNewSale({...newSale, store_id: value})}>
-                  <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder="Select store" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {stores.map((store) => (
-                      <SelectItem key={store.id} value={store.id}>
-                        {store.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="payment" className="text-right">
                   Payment Method
                 </Label>
@@ -162,12 +161,23 @@ export default function SalesPage() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="document" className="text-right">
+                  Document Image
+                </Label>
+                <div className="col-span-3">
+                  <FileUpload 
+                    onFileChange={setSaleDocument}
+                    value={saleDocument}
+                  />
+                </div>
+              </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleCreateSale} disabled={!newSale.amount || !newSale.description.trim() || !newSale.store_id.trim()}>
+              <Button onClick={handleCreateSale} disabled={!newSale.amount || !newSale.description.trim()}>
                 Record Sale
               </Button>
             </DialogFooter>
@@ -182,7 +192,7 @@ export default function SalesPage() {
         </CardHeader>
         <CardContent>
           <div className="text-3xl font-bold text-green-600">
-            ${totalSales.toFixed(2)}
+            Php {totalSales.toFixed(2)}
           </div>
           <p className="text-sm text-gray-600 mt-2">
             {sales.length} transactions recorded
@@ -204,6 +214,7 @@ export default function SalesPage() {
                 <TableHead>Store</TableHead>
                 <TableHead>Payment Method</TableHead>
                 <TableHead>Amount</TableHead>
+                <TableHead>Document</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -224,7 +235,17 @@ export default function SalesPage() {
                     </span>
                   </TableCell>
                   <TableCell className="font-medium text-green-600">
-                    ${sale.amount.toFixed(2)}
+                    Php {sale.amount.toFixed(2)}
+                  </TableCell>
+                  <TableCell>
+                    {sale.document_image && (
+                      <img 
+                        src={sale.document_image} 
+                        alt="Sales document" 
+                        className="h-10 w-10 object-cover rounded cursor-pointer"
+                        onClick={() => window.open(sale.document_image, '_blank')}
+                      />
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

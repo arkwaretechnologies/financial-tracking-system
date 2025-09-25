@@ -15,21 +15,21 @@ export default function DashboardPage() {
   const stats = [
     {
       title: 'Total Sales',
-      value: '$12,450',
+      value: 'Php 12,450',
       change: '+12.5%',
       icon: DollarSign,
       color: 'text-green-600',
     },
     {
       title: 'Total Purchases',
-      value: '$8,230',
+      value: 'Php 8,230',
       change: '+5.2%',
       icon: TrendingUp,
       color: 'text-blue-600',
     },
     {
       title: 'Total Expenses',
-      value: '$2,150',
+      value: 'Php 2,150',
       change: '-3.1%',
       icon: DollarSign,
       color: 'text-red-600',
@@ -126,21 +126,21 @@ export default function DashboardPage() {
                   <p className="font-medium">Sale - Store A</p>
                   <p className="text-sm text-gray-600">2 hours ago</p>
                 </div>
-                <span className="text-green-600 font-medium">+$250</span>
+                <span className="text-green-600 font-medium">+Php 250</span>
               </div>
               <div className="flex justify-between items-center">
                 <div>
                   <p className="font-medium">Purchase - Inventory</p>
                   <p className="text-sm text-gray-600">5 hours ago</p>
                 </div>
-                <span className="text-blue-600 font-medium">-$180</span>
+                <span className="text-blue-600 font-medium">-Php 180</span>
               </div>
               <div className="flex justify-between items-center">
                 <div>
                   <p className="font-medium">Expense - Utilities</p>
                   <p className="text-sm text-gray-600">1 day ago</p>
                 </div>
-                <span className="text-red-600 font-medium">-$45</span>
+                <span className="text-red-600 font-medium">-Php 45</span>
               </div>
             </div>
           </CardContent>

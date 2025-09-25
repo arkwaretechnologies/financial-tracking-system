@@ -154,7 +154,7 @@ export default function TransactionsPage() {
                   <TableCell>{transaction.store}</TableCell>
                   <TableCell>{transaction.category}</TableCell>
                   <TableCell className="text-right font-medium">
-                    {transaction.type === 'sale' ? '+' : '-'}${transaction.amount.toFixed(2)}
+                    {transaction.type === 'sale' ? '+' : '-'}Php {transaction.amount.toFixed(2)}
                   </TableCell>
                 </TableRow>
               ))}

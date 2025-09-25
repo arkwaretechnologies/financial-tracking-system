@@ -204,7 +204,7 @@ export default function ExpensesPage() {
         </CardHeader>
         <CardContent>
           <div className="text-3xl font-bold text-red-600">
-            ${totalExpenses.toFixed(2)}
+            Php {totalExpenses.toFixed(2)}
           </div>
           <p className="text-sm text-gray-600 mt-2">
             {expenses.length} expense transactions recorded
@@ -256,7 +256,7 @@ export default function ExpensesPage() {
                   <TableCell>{expense.paid_to}</TableCell>
                   <TableCell>{expense.store_name}</TableCell>
                   <TableCell className="font-medium text-red-600">
-                    ${expense.amount.toFixed(2)}
+                    Php {expense.amount.toFixed(2)}
                   </TableCell>
                 </TableRow>
               ))}

@@ -201,7 +201,7 @@ export default function PurchasesPage() {
         </CardHeader>
         <CardContent>
           <div className="text-3xl font-bold text-blue-600">
-            ${totalPurchases.toFixed(2)}
+            Php {totalPurchases.toFixed(2)}
           </div>
           <p className="text-sm text-gray-600 mt-2">
             {purchases.length} purchase transactions recorded
@@ -247,7 +247,7 @@ export default function PurchasesPage() {
                     </span>
                   </TableCell>
                   <TableCell className="font-medium text-blue-600">
-                    ${purchase.amount.toFixed(2)}
+                    Php {purchase.amount.toFixed(2)}
                   </TableCell>
                 </TableRow>
               ))}
