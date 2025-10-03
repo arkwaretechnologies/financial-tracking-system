@@ -112,4 +112,57 @@ router.post('/', authenticateToken as any, async (req: any, res) => {
   }
 });
 
+router.get('/client/:clientId', authenticateToken as any, async (req: any, res) => {
+  try {
+    const { clientId } = req.params;
+    const { startDate, endDate, storeId } = req.query;
+
+    // Access control: Ensure user has access to this client's data
+    if (req.user?.role !== 'super_admin' && req.user?.client_id !== clientId) {
+      return res.status(403).json({ error: 'Access denied to this client' });
+    }
+
+    let query = supabase
+      .from('sales')
+      .select(`
+        *,
+        stores (name)
+      `)
+      .eq('client_id', clientId);
+
+    if (storeId) {
+      query = query.eq('store_id', storeId);
+    }
+
+    if (startDate) {
+      query = query.gte('sales_date', startDate);
+    }
+
+    if (endDate) {
+      query = query.lte('sales_date', endDate);
+    }
+
+    query = query.order('sales_date', { ascending: false });
+
+    const { data: sales, error } = await query;
+
+    if (error) {
+      console.error('Get sales error:', error);
+      return res.status(500).json({ error: 'Failed to retrieve sales', details: error.message });
+    }
+
+    // Transform the data to include store_name at the top level
+    const transformedSales = sales.map((sale: any) => ({
+      ...sale,
+      store_name: sale.stores ? sale.stores.name : null,
+      stores: undefined, // Remove the nested stores object
+    }));
+
+    return res.status(200).json({ sales: transformedSales });
+  } catch (err: any) {
+    console.error('Get sales route error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 export default router;

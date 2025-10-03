@@ -11,44 +11,42 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { FileUpload } from '@/components/ui/file-upload';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
+import { useEffect } from 'react';
 
 interface Sale {
   id: string;
-  date: string;
+  sales_date: string;
   amount: number;
   description: string;
   store_name: string;
   payment_method: 'cash' | 'card' | 'transfer';
+  supporting_docs_bucket?: string;
   document_image?: string;
 }
 
 export default function SalesPage() {
-  const [sales, setSales] = useState<Sale[]>([
-    {
-      id: '1',
-      date: '2024-12-20',
-      amount: 250.00,
-      description: 'Product sales - Electronics',
-      store_name: 'Main Store',
-      payment_method: 'cash'
-    },
-    {
-      id: '2',
-      date: '2024-12-19',
-      amount: 180.50,
-      description: 'Product sales - Clothing',
-      store_name: 'Downtown Branch',
-      payment_method: 'card'
-    },
-    {
-      id: '3',
-      date: '2024-12-18',
-      amount: 320.75,
-      description: 'Product sales - Home goods',
-      store_name: 'Main Store',
-      payment_method: 'transfer'
-    }
-  ]);
+
+
+// ... existing code ...
+
+  const [sales, setSales] = useState<Sale[]>([]);
+  const { user, token } = useAuth();
+
+  useEffect(() => {
+    const fetchSales = async () => {
+      if (token && user?.client_id) {
+        try {
+          const response = await api.getSalesByClient(token, user.client_id);
+          setSales(response.sales);
+        } catch (error) {
+          console.error('Failed to fetch sales:', error);
+          // Optionally, show an error message to the user
+        }
+      }
+    };
+
+    fetchSales();
+  }, [token, user?.client_id]);
   const [newSale, setNewSale] = useState({ 
     date: new Date().toISOString().split('T')[0],
     amount: '', 
@@ -57,7 +55,6 @@ export default function SalesPage() {
   });
   const [saleDocument, setSaleDocument] = useState<File | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const { user, token } = useAuth();
 
   // Mock stores data
   const stores = [
@@ -87,7 +84,7 @@ export default function SalesPage() {
       
       const sale: Sale = {
         id: Date.now().toString(),
-        date: newSale.date,
+        sales_date: newSale.date,
         amount: parseFloat(newSale.amount),
         description: newSale.description,
         store_name: store?.name || 'Unknown',
@@ -97,6 +94,8 @@ export default function SalesPage() {
       
       // Optimistic UI update
       setSales([sale, ...sales]);
+
+      // ... existing code ...
 
       // Persist to backend Supabase via API
       if (token && user?.client_id) {
@@ -110,9 +109,15 @@ export default function SalesPage() {
           image_base64: documentImageBase64 || undefined,
           image_filename: imageFilename,
         });
+
+        // Refetch sales data
+        const response = await api.getSalesByClient(token, user.client_id);
+        setSales(response.sales);
       } else {
         console.warn('No token or client_id available; sale was added locally only.');
       }
+      
+      // ... existing code ...
       
       setNewSale({ date: new Date().toISOString().split('T')[0], amount: '', description: '', payment_method: 'cash' });
       setSaleDocument(null);
@@ -257,31 +262,22 @@ export default function SalesPage() {
             <TableBody>
               {sales.map((sale) => (
                 <TableRow key={sale.id}>
-                  <TableCell>{new Date(sale.date).toLocaleDateString()}</TableCell>
+                  <TableCell>{new Date(sale.sales_date.replace(/-/g, '/')).toLocaleDateString()}</TableCell>
                   <TableCell>{sale.description}</TableCell>
-                  <TableCell>{sale.store_name}</TableCell>
+                  <TableCell>{sale.store_name || 'N/A'}</TableCell>
                   <TableCell>
-                    <span className={`px-2 py-1 rounded-full text-xs ${
-                      sale.payment_method === 'cash' 
-                        ? 'bg-green-100 text-green-800' 
-                        : sale.payment_method === 'card'
-                        ? 'bg-blue-100 text-blue-800'
-                        : 'bg-purple-100 text-purple-800'
-                    }`}>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${sale.payment_method === 'cash' ? 'bg-green-100 text-green-800' : sale.payment_method === 'card' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'}`}>
                       {sale.payment_method.toUpperCase()}
                     </span>
                   </TableCell>
-                  <TableCell className="font-medium text-green-600">
-                    Php {sale.amount.toFixed(2)}
+                  <TableCell className="text-right font-medium text-green-600">
+                    {new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(sale.amount)}
                   </TableCell>
                   <TableCell>
-                    {sale.document_image && (
-                      <img 
-                        src={sale.document_image} 
-                        alt="Sales document" 
-                        className="h-10 w-10 object-cover rounded cursor-pointer"
-                        onClick={() => window.open(sale.document_image, '_blank')}
-                      />
+                    {sale.supporting_docs_bucket && (
+                      <a href={sale.supporting_docs_bucket} target="_blank" rel="noopener noreferrer">
+                        <img src={sale.supporting_docs_bucket} alt="Sale Document" className="h-10 w-10 object-cover" />
+                      </a>
                     )}
                   </TableCell>
                 </TableRow>

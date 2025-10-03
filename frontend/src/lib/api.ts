@@ -181,6 +181,14 @@ class ApiClient {
     );
   }
 
+  async getSalesByClient(token: string, clientId: string): Promise<{ sales: any[] }> {
+    return this.request<{ sales: any[] }>(`/sales/client/${clientId}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+  }
+
   async getStoresByClient(token: string, clientId: string): Promise<{ stores: any[] }> {
     return this.request<{ stores: any[] }>(`/stores/client/${clientId}`, {
       headers: {
