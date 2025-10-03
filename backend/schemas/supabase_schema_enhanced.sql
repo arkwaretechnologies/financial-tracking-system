@@ -225,6 +225,88 @@ ALTER TABLE audit_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE password_reset_tokens ENABLE ROW LEVEL SECURITY;
 
+-- Sales table for recording store sales
+CREATE TABLE sales (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    client_id UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+    store_id UUID REFERENCES stores(id) ON DELETE SET NULL,
+    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    description TEXT,
+    payment_method TEXT,
+    amount NUMERIC(10, 2) NOT NULL CHECK (amount >= 0),
+    sales_date DATE NOT NULL,
+    supporting_docs_bucket TEXT
+);
+
+-- Enable Row Level Security (RLS) for sales
+ALTER TABLE sales ENABLE ROW LEVEL SECURITY;
+
+-- Sales table policies
+CREATE POLICY "Users can view sales for their client" ON sales
+    FOR SELECT TO authenticated
+    USING (
+        client_id = (SELECT client_id FROM users WHERE id = auth.uid()) OR
+        EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'super_admin')
+    );
+
+CREATE POLICY "Users can create sales for their client" ON sales
+    FOR INSERT TO authenticated
+    WITH CHECK (
+        (
+            store_id IS NULL AND
+            client_id = (SELECT client_id FROM users WHERE id = auth.uid())
+        ) OR EXISTS (
+            SELECT 1 FROM stores 
+            WHERE stores.id = sales.store_id 
+            AND stores.client_id = (SELECT client_id FROM users WHERE id = auth.uid())
+        ) OR EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'super_admin')
+    );
+
+-- Helpful indexes
+CREATE INDEX idx_sales_client_id ON sales(client_id);
+CREATE INDEX idx_sales_store_id ON sales(store_id);
+CREATE INDEX idx_sales_user_id ON sales(user_id);
+CREATE INDEX idx_sales_sales_date ON sales(sales_date);
+
+-- Create storage bucket for sales pictures
+SELECT storage.create_bucket(
+    'sales',
+    public := false,
+    file_size_limit := 5242880, -- 5 MB
+    allowed_mime_types := ARRAY['image/png', 'image/jpeg', 'image/webp']
+);
+
+-- Storage policies for sales bucket
+-- Only allow authenticated users; super_admins can view all, users can access their own objects
+CREATE POLICY "Sales pictures - view own or super admin" ON storage.objects
+    FOR SELECT TO authenticated
+    USING (
+        bucket_id = 'sales' AND (
+            owner = auth.uid() OR EXISTS (
+                SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'super_admin'
+            )
+        )
+    );
+
+CREATE POLICY "Sales pictures - upload" ON storage.objects
+    FOR INSERT TO authenticated
+    WITH CHECK (
+        bucket_id = 'sales' AND owner = auth.uid()
+    );
+
+CREATE POLICY "Sales pictures - update own" ON storage.objects
+    FOR UPDATE TO authenticated
+    USING (
+        bucket_id = 'sales' AND owner = auth.uid()
+    );
+
+CREATE POLICY "Sales pictures - delete own" ON storage.objects
+    FOR DELETE TO authenticated
+    USING (
+        bucket_id = 'sales' AND owner = auth.uid()
+    );
+
+
 -- Clients policies
 CREATE POLICY "Super admin can view all clients" ON clients
     FOR ALL TO authenticated

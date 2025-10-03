@@ -9,6 +9,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { FileUpload } from '@/components/ui/file-upload';
+import { useAuth } from '@/contexts/AuthContext';
+import { api } from '@/lib/api';
 
 interface Sale {
   id: string;
@@ -48,12 +50,14 @@ export default function SalesPage() {
     }
   ]);
   const [newSale, setNewSale] = useState({ 
+    date: new Date().toISOString().split('T')[0],
     amount: '', 
     description: '', 
     payment_method: 'cash' as 'cash' | 'card' | 'transfer'
   });
   const [saleDocument, setSaleDocument] = useState<File | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const { user, token } = useAuth();
 
   // Mock stores data
   const stores = [
@@ -71,30 +75,51 @@ export default function SalesPage() {
       
       // Convert image to base64 if available
       let documentImageBase64 = '';
+      let imageFilename: string | undefined = undefined;
       if (saleDocument) {
         const reader = new FileReader();
         documentImageBase64 = await new Promise((resolve) => {
-          reader.onloadend = () => resolve(reader.result as string);
+          reader.onloadend = () => resolve((reader.result as string).split(',')[1] || '');
           reader.readAsDataURL(saleDocument);
         });
+        imageFilename = saleDocument.name;
       }
       
       const sale: Sale = {
         id: Date.now().toString(),
-        date: new Date().toISOString().split('T')[0],
+        date: newSale.date,
         amount: parseFloat(newSale.amount),
         description: newSale.description,
         store_name: store?.name || 'Unknown',
         payment_method: newSale.payment_method,
-        document_image: documentImageBase64 || undefined
+        document_image: documentImageBase64 ? `data:${saleDocument?.type};base64,${documentImageBase64}` : undefined
       };
       
+      // Optimistic UI update
       setSales([sale, ...sales]);
-      setNewSale({ amount: '', description: '', payment_method: 'cash' });
+
+      // Persist to backend Supabase via API
+      if (token && user?.client_id) {
+        await api.createSale(token, {
+          client_id: user.client_id,
+          store_id: user.store_id || undefined,
+          description: newSale.description,
+          payment_method: newSale.payment_method,
+          amount: parseFloat(newSale.amount),
+          sales_date: newSale.date,
+          image_base64: documentImageBase64 || undefined,
+          image_filename: imageFilename,
+        });
+      } else {
+        console.warn('No token or client_id available; sale was added locally only.');
+      }
+      
+      setNewSale({ date: new Date().toISOString().split('T')[0], amount: '', description: '', payment_method: 'cash' });
       setSaleDocument(null);
       setIsDialogOpen(false);
     } catch (error) {
       console.error('Error creating sale:', error);
+      alert(`Error creating sale: ${error instanceof Error ? error.message : 'Failed to create sale'}`);
     }
   };
 
@@ -121,8 +146,32 @@ export default function SalesPage() {
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="amount" className="text-right">
-                  Amount ($)
+                <Label htmlFor="date">
+                  Sales Date
+                </Label>
+                <Input
+                  id="date"
+                  type="date"
+                  value={newSale.date}
+                  onChange={(e) => setNewSale({...newSale, date: e.target.value})}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="description">
+                  Description
+                </Label>
+                <Input
+                  id="description"
+                  value={newSale.description}
+                  onChange={(e) => setNewSale({...newSale, description: e.target.value})}
+                  className="col-span-3"
+                  placeholder="What was sold?"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="amount">
+                  Amount
                 </Label>
                 <Input
                   id="amount"
@@ -135,19 +184,7 @@ export default function SalesPage() {
                 />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="description" className="text-right">
-                  Description
-                </Label>
-                <Input
-                  id="description"
-                  value={newSale.description}
-                  onChange={(e) => setNewSale({...newSale, description: e.target.value})}
-                  className="col-span-3"
-                  placeholder="What was sold?"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="payment" className="text-right">
+                <Label htmlFor="payment">
                   Payment Method
                 </Label>
                 <Select value={newSale.payment_method} onValueChange={(value) => setNewSale({...newSale, payment_method: value as 'cash' | 'card' | 'transfer'})}>
@@ -162,7 +199,7 @@ export default function SalesPage() {
                 </Select>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="document" className="text-right">
+                <Label htmlFor="document">
                   Document Image
                 </Label>
                 <div className="col-span-3">

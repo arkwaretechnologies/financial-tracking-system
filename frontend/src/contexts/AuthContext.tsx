@@ -25,6 +25,7 @@ interface User {
 interface AuthContextType {
   user: User | null;
   token: string | null;
+  stores: any[];
   login: (clientId: string, usernameOrEmail: string, password: string) => Promise<void>;
   logout: () => void;
   loading: boolean;
@@ -35,6 +36,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [stores, setStores] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
@@ -42,12 +44,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Check for existing token on mount
     const storedToken = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
-    
+    const storedStores = localStorage.getItem('stores');
+
     if (storedToken && storedUser) {
       setToken(storedToken);
       setUser(JSON.parse(storedUser));
+      if (storedStores) {
+        setStores(JSON.parse(storedStores));
+      }
     }
-    
+
     setLoading(false);
   }, []);
 
@@ -71,12 +77,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       // Call backend API
       const response = await api.login(loginData);
-      
+
       // Validate response data
       if (!response.user || !response.token) {
         throw new Error('Invalid response from authentication server');
       }
-      
+
+      // Fetch stores for the client
+      const storesResponse = await api.getStoresByClient(response.token, response.user.client_id);
+      const clientStores = storesResponse.stores;
+
       // Map backend role to frontend role with fallback
       const userRole = response.user.role === 'admin' ? 'admin' : 'client_user';
       
@@ -105,6 +115,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         localStorage.setItem('token', response.token);
         localStorage.setItem('user', JSON.stringify(userData));
+        localStorage.setItem('stores', JSON.stringify(clientStores));
       } catch (storageError) {
         console.warn('Failed to store authentication data in localStorage:', storageError);
       }
@@ -121,13 +132,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = () => {
     setToken(null);
     setUser(null);
+    setStores([]);
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    localStorage.removeItem('stores');
     router.push('/login');
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, token, stores, login, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );

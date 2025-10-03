@@ -1,33 +1,11 @@
 import express from 'express';
 import { authenticateToken } from '../middleware/auth';
+import { getStoresByClient } from '../controllers/storeController';
 
 const router = express.Router();
 
 // Get stores by client
-router.get('/client/:clientId', authenticateToken as any, async (req: any, res) => {
-  try {
-    const { clientId } = req.params;
-    const { supabase } = await import('../config/supabase');
-    
-    // Check if user has access to this client
-    if (req.user?.role !== 'super_admin' && req.user?.client_id !== clientId) {
-      return res.status(403).json({ error: 'Access denied to this client' });
-    }
-
-    const { data: stores, error } = await supabase
-      .from('stores')
-      .select('*')
-      .eq('client_id', clientId)
-      .order('name', { ascending: true });
-
-    if (error) throw error;
-
-    res.json({ stores });
-  } catch (error) {
-    console.error('Get stores error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+router.get('/client/:clientId', authenticateToken as any, getStoresByClient);
 
 // Get store by ID
 router.get('/:id', authenticateToken as any, async (req: any, res) => {

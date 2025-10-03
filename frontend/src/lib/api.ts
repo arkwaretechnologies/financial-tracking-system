@@ -70,6 +70,17 @@ interface CreateUserRequest {
   is_active?: boolean;
 }
 
+interface CreateSaleRequest {
+  client_id: string;
+  store_id?: string;
+  description?: string;
+  payment_method?: 'cash' | 'card' | 'transfer' | string;
+  amount: number;
+  sales_date: string; // YYYY-MM-DD
+  image_base64?: string;
+  image_filename?: string;
+}
+
 class ApiClient {
   private baseUrl: string;
 
@@ -94,8 +105,15 @@ class ApiClient {
     const response = await fetch(url, config);
     
     if (!response.ok) {
-      const errorData: ApiError = await response.json().catch(() => ({ error: 'Unknown error' }));
-      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      let errorMessage;
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const errorData = await response.json();
+        errorMessage = errorData.message || errorData.details || errorData.error || `HTTP error! status: ${response.status}`;
+      } else {
+        errorMessage = await response.text();
+      }
+      throw new Error(errorMessage);
     }
 
     return response.json();
@@ -146,6 +164,28 @@ class ApiClient {
         Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify(userData),
+    });
+  }
+
+  // Add sales API support
+  async createSale(token: string, saleData: CreateSaleRequest): Promise<{ sale: any; image_path?: string; message: string }> {
+    return this.request<{ sale: any; image_path?: string; message: string }>(
+      '/sales',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(saleData),
+      }
+    );
+  }
+
+  async getStoresByClient(token: string, clientId: string): Promise<{ stores: any[] }> {
+    return this.request<{ stores: any[] }>(`/stores/client/${clientId}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
     });
   }
 }

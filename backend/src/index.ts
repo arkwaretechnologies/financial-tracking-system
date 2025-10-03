@@ -10,19 +10,21 @@ import clientRoutes from './routes/clients';
 import storeRoutes from './routes/stores';
 import transactionRoutes from './routes/transactions';
 import rolesRoutes from './routes/roles';
+import salesRoutes from './routes/sales';
 
 // Load environment variables
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3001;
 
 // Middleware
 app.use(cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
   credentials: true
 }));
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Initialize Supabase
 export const supabase = createClient(
@@ -37,6 +39,7 @@ app.use('/api/clients', clientRoutes);
 app.use('/api/stores', storeRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/roles', rolesRoutes);
+app.use('/api/sales', salesRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

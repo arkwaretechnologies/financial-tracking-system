@@ -36,16 +36,10 @@ interface NavItem {
 
 export default function DashboardNav() {
   const { user, logout } = useAuth();
-  const { stores, currentStore, setCurrentStore, fetchStores } = useStore();
+  const { stores, currentStore, setCurrentStore } = useStore();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  useEffect(() => {
-    if (fetchStores) {
-      fetchStores();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // Define menu items with role-based access
   const navItems: NavItem[] = [

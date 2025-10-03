@@ -1,6 +1,8 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { useAuth } from './AuthContext';
+import { api } from '@/lib/api';
 
 interface Store {
   id: string;
@@ -14,84 +16,46 @@ interface StoreContextType {
   currentStore: Store | null;
   setCurrentStore: (store: Store) => void;
   loading: boolean;
-  fetchStores: () => Promise<void>;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
+  const { user, token } = useAuth();
   const [stores, setStores] = useState<Store[]>([]);
   const [currentStore, setCurrentStore] = useState<Store | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Load stores and selected store from localStorage on mount
   useEffect(() => {
-    const storedStores = localStorage.getItem('stores');
-    const storedCurrentStore = localStorage.getItem('currentStore');
-    
-    if (storedStores) {
-      setStores(JSON.parse(storedStores));
-    } else {
-      // If no stores in localStorage, set mock data directly
-      const mockStores: Store[] = [
-        { id: '1', name: 'Main Store', location: 'New York', client_id: '1' },
-        { id: '2', name: 'Branch Store', location: 'Los Angeles', client_id: '1' },
-        { id: '3', name: 'Online Store', location: 'Online', client_id: '1' }
-      ];
-      
-      setStores(mockStores);
-      localStorage.setItem('stores', JSON.stringify(mockStores));
-      
-      // Set first store as current if none selected
-      if (!storedCurrentStore && mockStores.length > 0) {
-        setCurrentStore(mockStores[0]);
-        localStorage.setItem('currentStore', JSON.stringify(mockStores[0]));
-      }
-    }
-    
-    if (storedCurrentStore) {
-      setCurrentStore(JSON.parse(storedCurrentStore));
-    }
-    
-    setLoading(false);
-  }, []);
+    const fetchStores = async () => {
+      if (user && token) {
+        try {
+          setLoading(true);
+          const response = await api.getStoresByClient(token, user.client_id);
+          setStores(response.stores);
 
-  // Save current store to localStorage when it changes
+          const storedCurrentStore = localStorage.getItem('currentStore');
+          if (storedCurrentStore) {
+            setCurrentStore(JSON.parse(storedCurrentStore));
+          } else if (response.stores.length > 0) {
+            setCurrentStore(response.stores[0]);
+          }
+        } catch (error) {
+          console.error('Failed to fetch stores:', error);
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchStores();
+  }, [user, token]);
+
   useEffect(() => {
     if (currentStore) {
       localStorage.setItem('currentStore', JSON.stringify(currentStore));
     }
   }, [currentStore]);
-
-  // Fetch stores from API
-  const fetchStores = async () => {
-    try {
-      setLoading(true);
-      
-      // For demo purposes, we'll use mock data
-      // In production, this would fetch from your API
-      const mockStores: Store[] = [
-        { id: '1', name: 'Main Store', location: 'New York', client_id: '1' },
-        { id: '2', name: 'Branch Store', location: 'Los Angeles', client_id: '1' },
-        { id: '3', name: 'Online Store', location: 'Online', client_id: '1' }
-      ];
-      
-      setStores(mockStores);
-      
-      // Set first store as current if none selected
-      if (!currentStore && mockStores.length > 0) {
-        setCurrentStore(mockStores[0]);
-      }
-      
-      // Save to localStorage
-      localStorage.setItem('stores', JSON.stringify(mockStores));
-      
-    } catch (error) {
-      console.error('Failed to fetch stores:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
     <StoreContext.Provider 
@@ -99,8 +63,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         stores, 
         currentStore, 
         setCurrentStore, 
-        loading,
-        fetchStores
+        loading
       }}
     >
       {children}

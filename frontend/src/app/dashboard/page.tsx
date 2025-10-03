@@ -7,7 +7,7 @@ import { Users, Store, DollarSign, TrendingUp } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export default function DashboardPage() {
-  const { user } = useAuth();
+  const { user, stores } = useAuth();
   const router = useRouter();
 
   // Use client name from user data
@@ -36,7 +36,7 @@ export default function DashboardPage() {
     },
     {
       title: 'Active Stores',
-      value: user?.role === 'admin' ? 'All' : '1',
+      value: user?.role === 'admin' ? 'All' : stores.length.toString(),
       change: '0%',
       icon: Store,
       color: 'text-purple-600',
@@ -88,6 +88,22 @@ export default function DashboardPage() {
                 <p className="text-sm font-medium text-gray-600">Account Created</p>
                 <p className="text-sm text-gray-900">{new Date(user.client_created_at).toLocaleDateString()}</p>
               </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Stores Information Card */}
+        {stores.length > 0 && (
+          <Card className="mt-4 bg-green-50">
+            <CardHeader>
+              <CardTitle className="text-lg">Your Stores</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="list-disc list-inside">
+                {stores.map((store) => (
+                  <li key={store.id} className="text-sm text-gray-900">{store.name}</li>
+                ))}
+              </ul>
             </CardContent>
           </Card>
         )}
