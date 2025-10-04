@@ -11,6 +11,7 @@ import storeRoutes from './routes/stores';
 import transactionRoutes from './routes/transactions';
 import rolesRoutes from './routes/roles';
 import salesRoutes from './routes/sales';
+import purchasesRoutes from './routes/purchases';
 
 // Load environment variables
 dotenv.config();
@@ -40,6 +41,7 @@ app.use('/api/stores', storeRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/roles', rolesRoutes);
 app.use('/api/sales', salesRoutes);
+app.use('/api/purchases', purchasesRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

@@ -81,6 +81,21 @@ interface CreateSaleRequest {
   image_filename?: string;
 }
 
+export interface CreatePurchaseRequest {
+  client_id: string;
+  store_id?: string;
+  user_id?: string;
+  description?: string;
+  supplier?: string;
+  payment_method?: 'cash' | 'card' | 'check' | string;
+  amount: number;
+  purchase_date: string; // YYYY-MM-DD
+  image_base64?: string;
+  image_filename?: string;
+  category?: string;
+  other_category?: string;
+}
+
 class ApiClient {
   private baseUrl: string;
 
@@ -179,6 +194,24 @@ class ApiClient {
         body: JSON.stringify(saleData),
       }
     );
+  }
+
+  async getPurchases(token: string, clientId: string): Promise<{ purchases: any[] }> {
+    return this.request(`/purchases/client/${clientId}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+  }
+
+  async createPurchase(token: string, purchaseData: CreatePurchaseRequest): Promise<any> {
+    return this.request('/purchases', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(purchaseData),
+    });
   }
 
   async getSalesByClient(token: string, clientId: string): Promise<{ sales: any[] }> {

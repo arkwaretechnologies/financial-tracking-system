@@ -255,7 +255,7 @@ export default function SalesPage() {
                 <TableHead>Description</TableHead>
                 <TableHead>Store</TableHead>
                 <TableHead>Payment Method</TableHead>
-                <TableHead>Amount</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
                 <TableHead>Document</TableHead>
               </TableRow>
             </TableHeader>
