@@ -20,8 +20,7 @@ interface Sale {
   description: string;
   store_name: string;
   payment_method: 'cash' | 'card' | 'transfer';
-  supporting_docs_bucket?: string;
-  document_image?: string;
+  supp_doc_url?: string;
 }
 
 export default function SalesPage() {
@@ -89,13 +88,11 @@ export default function SalesPage() {
         description: newSale.description,
         store_name: store?.name || 'Unknown',
         payment_method: newSale.payment_method,
-        document_image: documentImageBase64 ? `data:${saleDocument?.type};base64,${documentImageBase64}` : undefined
+        supp_doc_url: documentImageBase64 ? `data:${saleDocument?.type};base64,${documentImageBase64}` : undefined
       };
       
       // Optimistic UI update
       setSales([sale, ...sales]);
-
-      // ... existing code ...
 
       // Persist to backend Supabase via API
       if (token && user?.client_id) {
@@ -116,8 +113,6 @@ export default function SalesPage() {
       } else {
         console.warn('No token or client_id available; sale was added locally only.');
       }
-      
-      // ... existing code ...
       
       setNewSale({ date: new Date().toISOString().split('T')[0], amount: '', description: '', payment_method: 'cash' });
       setSaleDocument(null);
@@ -274,9 +269,9 @@ export default function SalesPage() {
                     {new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(sale.amount)}
                   </TableCell>
                   <TableCell>
-                    {sale.supporting_docs_bucket && (
-                      <a href={sale.supporting_docs_bucket} target="_blank" rel="noopener noreferrer">
-                        <img src={sale.supporting_docs_bucket} alt="Sale Document" className="h-10 w-10 object-cover" />
+                    {sale.supp_doc_url && (
+                      <a href={sale.supp_doc_url} target="_blank" rel="noopener noreferrer">
+                        <img src={sale.supp_doc_url} alt="Sale Document" className="h-10 w-10 object-cover" />
                       </a>
                     )}
                   </TableCell>

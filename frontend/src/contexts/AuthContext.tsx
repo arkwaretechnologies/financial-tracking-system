@@ -41,19 +41,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
-    // Check for existing token on mount
     const storedToken = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
-    const storedStores = localStorage.getItem('stores');
-
     if (storedToken && storedUser) {
       setToken(storedToken);
       setUser(JSON.parse(storedUser));
-      if (storedStores) {
-        setStores(JSON.parse(storedStores));
-      }
     }
-
     setLoading(false);
   }, []);
 
