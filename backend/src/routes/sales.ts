@@ -112,6 +112,61 @@ router.post('/', authenticateToken as any, async (req: any, res) => {
   }
 });
 
+router.put('/:saleId', authenticateToken as any, async (req: any, res) => {
+  try {
+    const { saleId } = req.params;
+    const {
+      store_id,
+      description,
+      payment_method,
+      amount,
+      sales_date,
+    } = req.body;
+
+    const numericAmount = Number(amount);
+    if (Number.isNaN(numericAmount) || numericAmount < 0) {
+      return res.status(400).json({ error: 'Amount must be a non-negative number' });
+    }
+
+    const { data: existingSale, error: fetchError } = await supabase
+      .from('sales')
+      .select('client_id, store_id')
+      .eq('id', saleId)
+      .single();
+
+    if (fetchError || !existingSale) {
+      return res.status(404).json({ error: 'Sale not found' });
+    }
+
+    if (req.user?.role !== 'super_admin' && req.user?.client_id !== existingSale.client_id) {
+      return res.status(403).json({ error: 'Access denied to this sale' });
+    }
+
+    const { data: updatedSale, error: updateError } = await supabase
+      .from('sales')
+      .update({
+        ...(store_id && { store_id }),
+        description,
+        payment_method,
+        amount: numericAmount,
+        sales_date,
+      })
+      .eq('id', saleId)
+      .select('*')
+      .single();
+
+    if (updateError) {
+      console.error('Update sale error:', updateError);
+      return res.status(500).json({ error: 'Failed to update sale', details: updateError.message });
+    }
+
+    return res.status(200).json({ sale: updatedSale, message: 'Sale updated successfully' });
+  } catch (err: any) {
+    console.error('Update sale route error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 router.get('/client/:clientId', authenticateToken as any, async (req: any, res) => {
   try {
     const { clientId } = req.params;
@@ -161,6 +216,41 @@ router.get('/client/:clientId', authenticateToken as any, async (req: any, res) 
     return res.status(200).json({ sales: transformedSales });
   } catch (err: any) {
     console.error('Get sales route error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.delete('/:saleId', authenticateToken as any, async (req: any, res) => {
+  try {
+    const { saleId } = req.params;
+
+    const { data: existingSale, error: fetchError } = await supabase
+      .from('sales')
+      .select('client_id')
+      .eq('id', saleId)
+      .single();
+
+    if (fetchError || !existingSale) {
+      return res.status(404).json({ error: 'Sale not found' });
+    }
+
+    if (req.user?.role !== 'super_admin' && req.user?.client_id !== existingSale.client_id) {
+      return res.status(403).json({ error: 'Access denied to this sale' });
+    }
+
+    const { error: deleteError } = await supabase
+      .from('sales')
+      .delete()
+      .eq('id', saleId);
+
+    if (deleteError) {
+      console.error('Delete sale error:', deleteError);
+      return res.status(500).json({ error: 'Failed to delete sale', details: deleteError.message });
+    }
+
+    return res.status(200).json({ message: 'Sale deleted successfully' });
+  } catch (err: any) {
+    console.error('Delete sale route error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

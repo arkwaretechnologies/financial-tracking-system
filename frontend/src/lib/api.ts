@@ -182,6 +182,26 @@ class ApiClient {
     });
   }
 
+  private async put<T>(endpoint: string, data: any, token?: string): Promise<T> {
+    const headers: HeadersInit = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    return this.request<T>(endpoint, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+      headers,
+    });
+  }
+
+  private async delete<T>(endpoint: string, token?: string): Promise<T> {
+    const headers: HeadersInit = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    return this.request<T>(endpoint, { method: 'DELETE', headers });
+  }
+
   async validateClient(client_id: string): Promise<ValidateClientResponse> {
     return this.post('/auth/validate-client', { client_id });
   }
@@ -209,6 +229,14 @@ class ApiClient {
   // Add sales API support
   async createSale(token: string, saleData: CreateSaleRequest): Promise<{ sale: any; image_path?: string; message: string }> {
     return this.post('/sales', saleData, token);
+  }
+
+  async updateSale(token: string, saleId: string, saleData: Partial<CreateSaleRequest>): Promise<{ sale: any; message: string }> {
+    return this.put(`/sales/${saleId}`, saleData, token);
+  }
+
+  async deleteSale(token: string, saleId: string): Promise<{ message: string }> {
+    return this.delete(`/sales/${saleId}`, token);
   }
 
   async getPurchases(token: string, clientId: string): Promise<{ purchases: any[] }> {

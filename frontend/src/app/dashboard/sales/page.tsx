@@ -24,12 +24,17 @@ interface Sale {
 }
 
 export default function SalesPage() {
-
-
-// ... existing code ...
-
   const [sales, setSales] = useState<Sale[]>([]);
   const { user, token } = useAuth();
+  const [newSale, setNewSale] = useState({ 
+    date: new Date().toISOString().split('T')[0],
+    amount: '', 
+    description: '', 
+    payment_method: 'cash' as 'cash' | 'card' | 'transfer'
+  });
+  const [saleDocument, setSaleDocument] = useState<File | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingSale, setEditingSale] = useState<Sale | null>(null);
 
   useEffect(() => {
     const fetchSales = async () => {
@@ -46,14 +51,6 @@ export default function SalesPage() {
 
     fetchSales();
   }, [token, user?.client_id]);
-  const [newSale, setNewSale] = useState({ 
-    date: new Date().toISOString().split('T')[0],
-    amount: '', 
-    description: '', 
-    payment_method: 'cash' as 'cash' | 'card' | 'transfer'
-  });
-  const [saleDocument, setSaleDocument] = useState<File | null>(null);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   // Mock stores data
   const stores = [
@@ -120,6 +117,39 @@ export default function SalesPage() {
     } catch (error) {
       console.error('Error creating sale:', error);
       alert(`Error creating sale: ${error instanceof Error ? error.message : 'Failed to create sale'}`);
+    }
+  };
+
+  const handleUpdateSale = async () => {
+    if (!editingSale || !token) return;
+
+    try {
+      const updatedSale = await api.updateSale(token, editingSale.id, {
+        sales_date: editingSale.sales_date,
+        description: editingSale.description,
+        amount: editingSale.amount,
+        payment_method: editingSale.payment_method,
+      });
+
+      setSales(sales.map(s => s.id === editingSale.id ? { ...s, ...updatedSale.sale } : s));
+      setEditingSale(null);
+    } catch (error) {
+      console.error('Error updating sale:', error);
+      alert(`Error updating sale: ${error instanceof Error ? error.message : 'Failed to update sale'}`);
+    }
+  };
+
+  const handleDeleteSale = async (saleId: string) => {
+    if (!token) return;
+
+    if (window.confirm('Are you sure you want to delete this sale?')) {
+      try {
+        await api.deleteSale(token, saleId);
+        setSales(sales.filter(s => s.id !== saleId));
+      } catch (error) {
+        console.error('Error deleting sale:', error);
+        alert(`Error deleting sale: ${error instanceof Error ? error.message : 'Failed to delete sale'}`);
+      }
     }
   };
 
@@ -222,6 +252,69 @@ export default function SalesPage() {
         </Dialog>
       </div>
 
+      {/* Edit Sale Dialog */}
+      <Dialog open={!!editingSale} onOpenChange={() => setEditingSale(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Sale</DialogTitle>
+          </DialogHeader>
+          {editingSale && (
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-date">Sales Date</Label>
+                <Input
+                  id="edit-date"
+                  type="date"
+                  value={new Date(editingSale.sales_date).toISOString().split('T')[0]}
+                  onChange={(e) => setEditingSale({ ...editingSale, sales_date: e.target.value })}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-description">Description</Label>
+                <Input
+                  id="edit-description"
+                  value={editingSale.description}
+                  onChange={(e) => setEditingSale({ ...editingSale, description: e.target.value })}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-amount">Amount</Label>
+                <Input
+                  id="edit-amount"
+                  type="number"
+                  step="0.01"
+                  value={editingSale.amount}
+                  onChange={(e) => setEditingSale({ ...editingSale, amount: parseFloat(e.target.value) || 0 })}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-payment">Payment Method</Label>
+                <Select
+                  value={editingSale.payment_method}
+                  onValueChange={(value) => setEditingSale({ ...editingSale, payment_method: value as 'cash' | 'card' | 'transfer' })}
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="card">Card</SelectItem>
+                    <SelectItem value="transfer">Bank Transfer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingSale(null)}>Cancel</Button>
+            <Button onClick={handleUpdateSale}>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Card>
         <CardHeader>
           <CardTitle>Sales Summary</CardTitle>
@@ -252,6 +345,7 @@ export default function SalesPage() {
                 <TableHead>Payment Method</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
                 <TableHead>Document</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -274,6 +368,14 @@ export default function SalesPage() {
                         <img src={sale.supp_doc_url} alt="Sale Document" className="h-10 w-10 object-cover" />
                       </a>
                     )}
+                  </TableCell>
+                  <TableCell>
+                    <Button variant="outline" size="sm" className="mr-2" onClick={() => setEditingSale(sale)}>
+                      Edit
+                    </Button>
+                    <Button variant="destructive" size="sm" onClick={() => handleDeleteSale(sale.id)}>
+                      Delete
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
