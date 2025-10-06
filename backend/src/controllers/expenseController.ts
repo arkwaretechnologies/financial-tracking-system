@@ -8,7 +8,7 @@ export const getExpensesByClient = async (req: Request, res: Response) => {
     const { data: expenses, error } = await supabase
       .from('expenses')
       .select(`
-        id,
+        ref_num,
         description,
         paid_to,
         payment_method,
@@ -43,6 +43,7 @@ export const getExpensesByClient = async (req: Request, res: Response) => {
 
 export const createExpense = async (req: Request, res: Response) => {
   const {
+    ref_num,
     client_id,
     store_id,
     user_id,
@@ -87,6 +88,7 @@ export const createExpense = async (req: Request, res: Response) => {
     const { data, error } = await supabase
       .from('expenses')
       .insert([{
+        ref_num,
         client_id,
         store_id,
         user_id,
@@ -105,6 +107,61 @@ export const createExpense = async (req: Request, res: Response) => {
     }
 
     res.status(201).json(data);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+};
+
+export const updateExpense = async (req: Request, res: Response) => {
+  const { refNum } = req.params;
+  const {
+    store_id,
+    description,
+    paid_to,
+    payment_method,
+    amount,
+    expense_date,
+  } = req.body;
+
+  try {
+    const { data, error } = await supabase
+      .from('expenses')
+      .update({
+        store_id,
+        description,
+        paid_to,
+        payment_method,
+        amount,
+        expense_date,
+      })
+      .eq('ref_num', refNum)
+      .select('*')
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    res.status(200).json(data);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+};
+
+export const deleteExpense = async (req: Request, res: Response) => {
+  const { refNum } = req.params;
+
+  try {
+    const { error } = await supabase
+      .from('expenses')
+      .delete()
+      .eq('ref_num', refNum);
+
+    if (error) {
+      throw error;
+    }
+
+    res.status(204).send();
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }

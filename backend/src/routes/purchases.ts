@@ -22,6 +22,7 @@ function getContentType(filename?: string) {
 router.post('/', authenticateToken as any, async (req: any, res) => {
   try {
     const {
+      ref_num, // Added ref_num
       client_id,
       store_id,
       description,
@@ -35,8 +36,8 @@ router.post('/', authenticateToken as any, async (req: any, res) => {
       other_category
     } = req.body;
 
-    if (!client_id || !purchase_date || amount === undefined) {
-      return res.status(400).json({ error: 'client_id, purchase_date, and amount are required' });
+    if (!ref_num || !client_id || !purchase_date || amount === undefined) {
+      return res.status(400).json({ error: 'ref_num, client_id, purchase_date, and amount are required' });
     }
 
     const numericAmount = Number(amount);
@@ -91,6 +92,7 @@ router.post('/', authenticateToken as any, async (req: any, res) => {
       .from('purchases')
       .insert([
         {
+          ref_num, // Added ref_num
           client_id,
           ...(store_id && { store_id }),
           user_id: req.user?.id || null,
@@ -120,5 +122,80 @@ router.post('/', authenticateToken as any, async (req: any, res) => {
 });
 
 router.get('/client/:clientId', authenticateToken as any, getPurchasesByClient);
+
+// Update a purchase
+router.put('/:refNum', authenticateToken as any, async (req: any, res) => {
+  try {
+    const { refNum } = req.params;
+    const { description, supplier, payment_method, amount, purchase_date, category, other_category } = req.body;
+
+    const { data: existingPurchase, error: fetchError } = await supabase
+      .from('purchases')
+      .select('client_id')
+      .eq('ref_num', refNum)
+      .single();
+
+    if (fetchError || !existingPurchase) {
+      return res.status(404).json({ error: 'Purchase not found' });
+    }
+
+    if (req.user?.role !== 'super_admin' && req.user?.client_id !== existingPurchase.client_id) {
+      return res.status(403).json({ error: 'Access denied to this purchase' });
+    }
+
+    const { data: purchase, error } = await supabase
+      .from('purchases')
+      .update({ description, supplier, payment_method, amount, purchase_date, category, other_category })
+      .eq('ref_num', refNum)
+      .select('*')
+      .single();
+
+    if (error) {
+      console.error('Update purchase error:', error);
+      return res.status(500).json({ error: 'Failed to update purchase', details: error.message });
+    }
+
+    return res.status(200).json({ purchase, message: 'Purchase updated successfully' });
+  } catch (err: any) {
+    console.error('Update purchase route error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Delete a purchase
+router.delete('/:refNum', authenticateToken as any, async (req: any, res) => {
+  try {
+    const { refNum } = req.params;
+
+    const { data: existingPurchase, error: fetchError } = await supabase
+      .from('purchases')
+      .select('client_id')
+      .eq('ref_num', refNum)
+      .single();
+
+    if (fetchError || !existingPurchase) {
+      return res.status(404).json({ error: 'Purchase not found' });
+    }
+
+    if (req.user?.role !== 'super_admin' && req.user?.client_id !== existingPurchase.client_id) {
+      return res.status(403).json({ error: 'Access denied to this purchase' });
+    }
+
+    const { error: deleteError } = await supabase
+      .from('purchases')
+      .delete()
+      .eq('ref_num', refNum);
+
+    if (deleteError) {
+      console.error('Delete purchase error:', deleteError);
+      return res.status(500).json({ error: 'Failed to delete purchase', details: deleteError.message });
+    }
+
+    return res.status(200).json({ message: 'Purchase deleted successfully' });
+  } catch (err: any) {
+    console.error('Delete purchase route error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 export default router;

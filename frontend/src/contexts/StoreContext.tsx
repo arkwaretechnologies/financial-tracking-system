@@ -27,11 +27,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Clear current store from local storage if user changes
-    localStorage.removeItem('currentStore');
-  }, [user]);
-
-  useEffect(() => {
     const fetchStores = async () => {
       if (user && token) {
         try {

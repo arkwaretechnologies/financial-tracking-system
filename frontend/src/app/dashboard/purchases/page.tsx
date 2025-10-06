@@ -15,7 +15,7 @@ import { api, CreatePurchaseRequest } from '@/lib/api';
 import { useEffect } from 'react';
 
 interface Purchase {
-  id: string;
+  ref_num: string;
   purchase_date: string;
   amount: number;
   description: string;
@@ -47,6 +47,7 @@ export default function PurchasesPage() {
   }, [token, user?.client_id]);
 
   const [newPurchase, setNewPurchase] = useState({ 
+    ref_num: '',
     date: new Date().toISOString().split('T')[0],
     amount: '', 
     description: '', 
@@ -57,6 +58,8 @@ export default function PurchasesPage() {
   });
   const [purchaseDocument, setPurchaseDocument] = useState<File | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingPurchase, setEditingPurchase] = useState<Purchase | null>(null);
+  const [deletingPurchase, setDeletingPurchase] = useState<Purchase | null>(null);
 
   const handleCreatePurchase = async () => {
     if (!newPurchase.amount || !newPurchase.description.trim() || !newPurchase.supplier.trim()) {
@@ -81,6 +84,7 @@ export default function PurchasesPage() {
     }
 
     const purchaseData: CreatePurchaseRequest = {
+      ref_num: newPurchase.ref_num,
       client_id: user?.client_id || '',
       store_id: currentStore.id || undefined,
       user_id: user?.id || '',
@@ -106,6 +110,7 @@ export default function PurchasesPage() {
       setPurchases([response.purchase, ...purchases]);
       setIsDialogOpen(false);
       setNewPurchase({ 
+        ref_num: '',
         date: new Date().toISOString().split('T')[0],
         amount: '', 
         description: '', 
@@ -118,6 +123,41 @@ export default function PurchasesPage() {
     } catch (error) {
       console.error('Detailed error creating purchase:', error);
       alert('Failed to create purchase. See console for details.');
+    }
+  };
+
+  const handleUpdatePurchase = async () => {
+    if (!editingPurchase || !token) return;
+
+    try {
+      const updatedPurchase = await api.updatePurchase(token, editingPurchase.ref_num, {
+        purchase_date: editingPurchase.purchase_date,
+        description: editingPurchase.description,
+        amount: editingPurchase.amount,
+        payment_method: editingPurchase.payment_method,
+        supplier: editingPurchase.supplier,
+        category: editingPurchase.category,
+        other_category: editingPurchase.other_category,
+      });
+
+      setPurchases(purchases.map(p => p.ref_num === editingPurchase.ref_num ? { ...p, ...updatedPurchase.purchase } : p));
+      setEditingPurchase(null);
+    } catch (error) {
+      console.error('Error updating purchase:', error);
+      alert(`Error updating purchase: ${error instanceof Error ? error.message : 'Failed to update purchase'}`);
+    }
+  };
+
+  const handleDeletePurchase = async () => {
+    if (!deletingPurchase || !token) return;
+
+    try {
+      await api.deletePurchase(token, deletingPurchase.ref_num);
+      setPurchases(purchases.filter(p => p.ref_num !== deletingPurchase.ref_num));
+      setDeletingPurchase(null);
+    } catch (error) {
+      console.error('Error deleting purchase:', error);
+      alert('Failed to delete purchase. See console for details.');
     }
   };
 
@@ -143,6 +183,18 @@ export default function PurchasesPage() {
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="ref_num">
+                  Reference Number
+                </Label>
+                <Input
+                  id="ref_num"
+                  value={newPurchase.ref_num}
+                  onChange={(e) => setNewPurchase({...newPurchase, ref_num: e.target.value})}
+                  className="col-span-3"
+                  placeholder="Enter reference number"
+                />
+              </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="date">
                   Purchase Date
@@ -262,6 +314,103 @@ export default function PurchasesPage() {
         </Dialog>
       </div>
 
+      {/* Edit Purchase Dialog */}
+      <Dialog open={!!editingPurchase} onOpenChange={() => setEditingPurchase(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Purchase</DialogTitle>
+          </DialogHeader>
+          {editingPurchase && (
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-ref_num">Reference Number</Label>
+                <Input
+                  id="edit-ref_num"
+                  value={editingPurchase.ref_num}
+                  disabled
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-date">Purchase Date</Label>
+                <Input
+                  id="edit-date"
+                  type="date"
+                  value={new Date(editingPurchase.purchase_date).toISOString().split('T')[0]}
+                  onChange={(e) => setEditingPurchase({ ...editingPurchase, purchase_date: e.target.value })}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-description">Description</Label>
+                <Input
+                  id="edit-description"
+                  value={editingPurchase.description}
+                  onChange={(e) => setEditingPurchase({ ...editingPurchase, description: e.target.value })}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-supplier">Supplier</Label>
+                <Input
+                  id="edit-supplier"
+                  value={editingPurchase.supplier}
+                  onChange={(e) => setEditingPurchase({ ...editingPurchase, supplier: e.target.value })}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-amount">Amount</Label>
+                <Input
+                  id="edit-amount"
+                  type="number"
+                  step="0.01"
+                  value={editingPurchase.amount}
+                  onChange={(e) => setEditingPurchase({ ...editingPurchase, amount: parseFloat(e.target.value) || 0 })}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-payment">Payment Method</Label>
+                <Select
+                  value={editingPurchase.payment_method}
+                  onValueChange={(value) => setEditingPurchase({ ...editingPurchase, payment_method: value as 'cash' | 'card' | 'check' })}
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="card">Card</SelectItem>
+                    <SelectItem value="check">Check</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingPurchase(null)}>Cancel</Button>
+            <Button onClick={handleUpdatePurchase}>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!deletingPurchase} onOpenChange={() => setDeletingPurchase(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Purchase</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this purchase? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeletingPurchase(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleDeletePurchase}>Delete</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Card>
         <CardHeader>
           <CardTitle>Purchases Summary</CardTitle>
@@ -269,7 +418,7 @@ export default function PurchasesPage() {
         </CardHeader>
         <CardContent>
           <div className="text-3xl font-bold text-red-600">
-            Php {totalPurchases.toFixed(2)}
+            {new Intl.NumberFormat('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(totalPurchases)}
           </div>
           <p className="text-sm text-gray-600 mt-2">
             {purchases.length} transactions recorded
@@ -286,17 +435,20 @@ export default function PurchasesPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Reference No.</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Description</TableHead>
                 <TableHead>Supplier</TableHead>
                 <TableHead>Payment Method</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
                 <TableHead>Document</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {purchases.map((purchase) => (
-                <TableRow key={purchase.id}>
+                <TableRow key={purchase.ref_num}>
+                  <TableCell>{purchase.ref_num}</TableCell>
                   <TableCell>{new Date(purchase.purchase_date).toLocaleDateString()}</TableCell>
                   <TableCell>{purchase.description}</TableCell>
                   <TableCell>{purchase.supplier}</TableCell>
@@ -314,6 +466,14 @@ export default function PurchasesPage() {
                         <img src={purchase.supp_doc_url} alt="Purchase Document" className="h-10 w-10 object-cover" />
                       </a>
                     )}
+                  </TableCell>
+                  <TableCell>
+                    <Button variant="outline" size="sm" className="mr-2" onClick={() => setEditingPurchase(purchase)}>
+                      Edit
+                    </Button>
+                    <Button variant="destructive" size="sm" onClick={() => setDeletingPurchase(purchase)}>
+                      Delete
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}

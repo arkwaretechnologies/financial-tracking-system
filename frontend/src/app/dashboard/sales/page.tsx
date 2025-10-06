@@ -12,9 +12,10 @@ import { FileUpload } from '@/components/ui/file-upload';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
 import { useEffect } from 'react';
+import { toast } from "sonner";
 
 interface Sale {
-  id: string;
+  ref_num: string;
   sales_date: string;
   amount: number;
   description: string;
@@ -26,7 +27,8 @@ interface Sale {
 export default function SalesPage() {
   const [sales, setSales] = useState<Sale[]>([]);
   const { user, token } = useAuth();
-  const [newSale, setNewSale] = useState({ 
+  const [newSale, setNewSale] = useState({
+    ref_num: '',
     date: new Date().toISOString().split('T')[0],
     amount: '', 
     description: '', 
@@ -60,12 +62,9 @@ export default function SalesPage() {
   ];
 
   const handleCreateSale = async () => {
-    if (!newSale.amount || !newSale.description.trim()) return;
+    if (!newSale.ref_num.trim() || !newSale.amount || !newSale.description.trim()) return;
 
     try {
-      // Use the first store as default (automatic store association)
-      const store = stores[0];
-      
       // Convert image to base64 if available
       let documentImageBase64 = '';
       let imageFilename: string | undefined = undefined;
@@ -77,23 +76,11 @@ export default function SalesPage() {
         });
         imageFilename = saleDocument.name;
       }
-      
-      const sale: Sale = {
-        id: Date.now().toString(),
-        sales_date: newSale.date,
-        amount: parseFloat(newSale.amount),
-        description: newSale.description,
-        store_name: store?.name || 'Unknown',
-        payment_method: newSale.payment_method,
-        supp_doc_url: documentImageBase64 ? `data:${saleDocument?.type};base64,${documentImageBase64}` : undefined
-      };
-      
-      // Optimistic UI update
-      setSales([sale, ...sales]);
 
       // Persist to backend Supabase via API
       if (token && user?.client_id) {
-        await api.createSale(token, {
+        const newSaleData = {
+          ref_num: newSale.ref_num,
           client_id: user.client_id,
           store_id: user.store_id || undefined,
           description: newSale.description,
@@ -102,21 +89,27 @@ export default function SalesPage() {
           sales_date: newSale.date,
           image_base64: documentImageBase64 || undefined,
           image_filename: imageFilename,
-        });
+        };
 
-        // Refetch sales data
-        const response = await api.getSalesByClient(token, user.client_id);
-        setSales(response.sales);
+        const response = await api.createSale(token, newSaleData);
+
+        // Optimistic UI update
+        setSales([response.sale, ...sales]);
+
       } else {
-        console.warn('No token or client_id available; sale was added locally only.');
+        console.warn('No token or client_id available; sale was not created.');
       }
       
-      setNewSale({ date: new Date().toISOString().split('T')[0], amount: '', description: '', payment_method: 'cash' });
+      setNewSale({ ref_num: '', date: new Date().toISOString().split('T')[0], amount: '', description: '', payment_method: 'cash' });
       setSaleDocument(null);
       setIsDialogOpen(false);
     } catch (error) {
       console.error('Error creating sale:', error);
-      alert(`Error creating sale: ${error instanceof Error ? error.message : 'Failed to create sale'}`);
+      if (error instanceof Error && error.message.includes("Reference number already exists")) {
+        alert("Reference number already exists.");
+      } else if (error instanceof Error) {
+        alert(error.message || "An unexpected error occurred.");
+      }
     }
   };
 
@@ -124,14 +117,14 @@ export default function SalesPage() {
     if (!editingSale || !token) return;
 
     try {
-      const updatedSale = await api.updateSale(token, editingSale.id, {
+      const updatedSale = await api.updateSale(token, editingSale.ref_num, {
         sales_date: editingSale.sales_date,
         description: editingSale.description,
         amount: editingSale.amount,
         payment_method: editingSale.payment_method,
       });
 
-      setSales(sales.map(s => s.id === editingSale.id ? { ...s, ...updatedSale.sale } : s));
+      setSales(sales.map(s => s.ref_num === editingSale.ref_num ? { ...s, ...updatedSale.sale } : s));
       setEditingSale(null);
     } catch (error) {
       console.error('Error updating sale:', error);
@@ -139,13 +132,13 @@ export default function SalesPage() {
     }
   };
 
-  const handleDeleteSale = async (saleId: string) => {
+  const handleDeleteSale = async (refNum: string) => {
     if (!token) return;
 
     if (window.confirm('Are you sure you want to delete this sale?')) {
       try {
-        await api.deleteSale(token, saleId);
-        setSales(sales.filter(s => s.id !== saleId));
+        await api.deleteSale(token, refNum);
+        setSales(sales.filter(s => s.ref_num !== refNum));
       } catch (error) {
         console.error('Error deleting sale:', error);
         alert(`Error deleting sale: ${error instanceof Error ? error.message : 'Failed to delete sale'}`);
@@ -175,6 +168,18 @@ export default function SalesPage() {
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="ref_num">
+                  Reference No.
+                </Label>
+                <Input
+                  id="ref_num"
+                  value={newSale.ref_num}
+                  onChange={(e) => setNewSale({...newSale, ref_num: e.target.value})}
+                  className="col-span-3"
+                  placeholder="Enter reference number"
+                />
+              </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="date">
                   Sales Date
@@ -258,56 +263,67 @@ export default function SalesPage() {
           <DialogHeader>
             <DialogTitle>Edit Sale</DialogTitle>
           </DialogHeader>
-          {editingSale && (
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="edit-date">Sales Date</Label>
-                <Input
-                  id="edit-date"
-                  type="date"
-                  value={new Date(editingSale.sales_date).toISOString().split('T')[0]}
-                  onChange={(e) => setEditingSale({ ...editingSale, sales_date: e.target.value })}
-                  className="col-span-3"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="edit-description">Description</Label>
-                <Input
-                  id="edit-description"
-                  value={editingSale.description}
-                  onChange={(e) => setEditingSale({ ...editingSale, description: e.target.value })}
-                  className="col-span-3"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="edit-amount">Amount</Label>
-                <Input
-                  id="edit-amount"
-                  type="number"
-                  step="0.01"
-                  value={editingSale.amount}
-                  onChange={(e) => setEditingSale({ ...editingSale, amount: parseFloat(e.target.value) || 0 })}
-                  className="col-span-3"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="edit-payment">Payment Method</Label>
-                <Select
-                  value={editingSale.payment_method}
-                  onValueChange={(value) => setEditingSale({ ...editingSale, payment_method: value as 'cash' | 'card' | 'transfer' })}
-                >
-                  <SelectTrigger className="col-span-3">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cash">Cash</SelectItem>
-                    <SelectItem value="card">Card</SelectItem>
-                    <SelectItem value="transfer">Bank Transfer</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit-ref_num" className="text-right">
+                Reference Number
+              </Label>
+              <Input
+                id="edit-ref_num"
+                value={editingSale?.ref_num || ''}
+                className="col-span-3"
+                disabled
+              />
             </div>
-          )}
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit-sales_date" className="text-right">
+                Sales Date
+              </Label>
+              <Input
+                id="edit-date"
+                type="date"
+                value={editingSale ? new Date(editingSale.sales_date).toISOString().split('T')[0] : ''}
+                onChange={(e) => setEditingSale(editingSale ? { ...editingSale, sales_date: e.target.value } : null)}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit-description">Description</Label>
+              <Input
+                id="edit-description"
+                value={editingSale?.description || ''}
+                onChange={(e) => setEditingSale(editingSale ? { ...editingSale, description: e.target.value } : null)}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit-amount">Amount</Label>
+              <Input
+                id="edit-amount"
+                type="number"
+                step="0.01"
+                value={editingSale?.amount || ''}
+                onChange={(e) => setEditingSale(editingSale ? { ...editingSale, amount: parseFloat(e.target.value) || 0 } : null)}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit-payment">Payment Method</Label>
+              <Select
+                value={editingSale?.payment_method || ''}
+                onValueChange={(value) => setEditingSale(editingSale ? { ...editingSale, payment_method: value as 'cash' | 'card' | 'transfer' } : null)}
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="card">Card</SelectItem>
+                  <SelectItem value="transfer">Bank Transfer</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditingSale(null)}>Cancel</Button>
             <Button onClick={handleUpdateSale}>Save Changes</Button>
@@ -322,7 +338,7 @@ export default function SalesPage() {
         </CardHeader>
         <CardContent>
           <div className="text-3xl font-bold text-green-600">
-            Php {totalSales.toFixed(2)}
+            {totalSales.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
           <p className="text-sm text-gray-600 mt-2">
             {sales.length} transactions recorded
@@ -339,6 +355,7 @@ export default function SalesPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Reference Number</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Description</TableHead>
                 <TableHead>Store</TableHead>
@@ -350,7 +367,8 @@ export default function SalesPage() {
             </TableHeader>
             <TableBody>
               {sales.map((sale) => (
-                <TableRow key={sale.id}>
+                <TableRow key={sale.ref_num}>
+                  <TableCell>{sale.ref_num}</TableCell>
                   <TableCell>{new Date(sale.sales_date.replace(/-/g, '/')).toLocaleDateString()}</TableCell>
                   <TableCell>{sale.description}</TableCell>
                   <TableCell>{sale.store_name || 'N/A'}</TableCell>
@@ -360,7 +378,7 @@ export default function SalesPage() {
                     </span>
                   </TableCell>
                   <TableCell className="text-right font-medium text-green-600">
-                    {new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(sale.amount)}
+                    {sale.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </TableCell>
                   <TableCell>
                     {sale.supp_doc_url && (
@@ -373,7 +391,7 @@ export default function SalesPage() {
                     <Button variant="outline" size="sm" className="mr-2" onClick={() => setEditingSale(sale)}>
                       Edit
                     </Button>
-                    <Button variant="destructive" size="sm" onClick={() => handleDeleteSale(sale.id)}>
+                    <Button variant="destructive" size="sm" onClick={() => handleDeleteSale(sale.ref_num)}>
                       Delete
                     </Button>
                   </TableCell>

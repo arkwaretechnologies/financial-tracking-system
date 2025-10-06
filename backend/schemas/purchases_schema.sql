@@ -1,5 +1,5 @@
 CREATE TABLE purchases (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    ref_num TEXT PRIMARY KEY,
     client_id UUID NOT NULL REFERENCES clients(id),
     store_id UUID REFERENCES stores(id),
     user_id UUID REFERENCES users(id),

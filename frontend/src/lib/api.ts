@@ -71,6 +71,7 @@ interface CreateUserRequest {
 }
 
 interface CreateSaleRequest {
+  ref_num: string;
   client_id: string;
   store_id?: string;
   description?: string;
@@ -82,6 +83,7 @@ interface CreateSaleRequest {
 }
 
 export interface CreatePurchaseRequest {
+  ref_num: string;
   client_id: string;
   store_id?: string;
   user_id?: string;
@@ -101,6 +103,7 @@ export interface CreatePurchase {
 }
 
 export interface CreateExpenseRequest {
+  ref_num: string;
   client_id: string;
   store_id: string;
   user_id: string;
@@ -114,7 +117,7 @@ export interface CreateExpenseRequest {
 }
 
 export interface Expense {
-  id: string;
+  ref_num: string;
   expense_date: string;
   amount: number;
   description: string;
@@ -231,12 +234,20 @@ class ApiClient {
     return this.post('/sales', saleData, token);
   }
 
-  async updateSale(token: string, saleId: string, saleData: Partial<CreateSaleRequest>): Promise<{ sale: any; message: string }> {
-    return this.put(`/sales/${saleId}`, saleData, token);
+  async updateSale(token: string, refNum: string, saleData: Partial<CreateSaleRequest>): Promise<{ sale: any; message: string }> {
+    return this.put(`/sales/${refNum}`, saleData, token);
   }
 
-  async deleteSale(token: string, saleId: string): Promise<{ message: string }> {
-    return this.delete(`/sales/${saleId}`, token);
+  async deleteSale(token: string, refNum: string): Promise<{ message: string }> {
+    return this.delete(`/sales/${refNum}`, token);
+  }
+
+  async getSalesByClient(token: string, clientId: string): Promise<{ sales: any[] }> {
+    return this.get(`/sales/client/${clientId}`, token);
+  }
+
+  async getStoresByClient(token: string, clientId: string): Promise<{ stores: any[] }> {
+    return this.get(`/stores/client/${clientId}`, token);
   }
 
   async getPurchases(token: string, clientId: string): Promise<{ purchases: any[] }> {
@@ -247,21 +258,30 @@ class ApiClient {
     return this.post('/purchases', purchaseData, token);
   }
 
-  async getExpensesByClient(token: string, clientId: string): Promise<{ expenses: any[] }> {
+  async updatePurchase(token: string, refNum: string, purchaseData: Partial<CreatePurchaseRequest>): Promise<any> {
+    return this.put(`/purchases/${refNum}`, purchaseData, token);
+  }
+
+  async deletePurchase(token: string, refNum: string): Promise<any> {
+    return this.delete(`/purchases/${refNum}`, token);
+  }
+
+  async getExpenses(token: string, clientId: string): Promise<{ expenses: Expense[] }> {
     return this.get(`/expenses/client/${clientId}`, token);
   }
 
-  async createExpense(token: string, data: CreateExpenseRequest): Promise<any> {
-    return this.post('/expenses', data, token);
+  async createExpense(token: string, expenseData: CreateExpenseRequest): Promise<any> {
+    return this.post('/expenses', expenseData, token);
   }
 
-  async getSalesByClient(token: string, clientId: string): Promise<{ sales: any[] }> {
-    return this.get(`/sales/client/${clientId}`, token);
+  async updateExpense(token: string, refNum: string, expenseData: Partial<CreateExpenseRequest>): Promise<any> {
+    return this.put(`/expenses/${refNum}`, expenseData, token);
   }
 
-  async getStoresByClient(token: string, clientId: string): Promise<{ stores: any[] }> {
-    return this.get(`/stores/client/${clientId}`, token);
+  async deleteExpense(token: string, refNum: string): Promise<any> {
+    return this.delete(`/expenses/${refNum}`, token);
   }
 }
 
+const apiClient = new ApiClient(API_BASE_URL);
 export const api = new ApiClient(API_BASE_URL);

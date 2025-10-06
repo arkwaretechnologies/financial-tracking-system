@@ -21,6 +21,7 @@ function getContentType(filename?: string) {
 router.post('/', authenticateToken as any, async (req: any, res) => {
   try {
     const {
+      ref_num, // Added ref_num
       client_id,
       store_id,
       description,
@@ -31,13 +32,25 @@ router.post('/', authenticateToken as any, async (req: any, res) => {
       image_filename
     } = req.body;
 
-    if (!client_id || !sales_date || amount === undefined) {
-      return res.status(400).json({ error: 'client_id, sales_date, and amount are required' });
+    if (!ref_num || !client_id || !sales_date || amount === undefined) { // Added ref_num to validation
+      return res.status(400).json({ error: 'ref_num, client_id, sales_date, and amount are required' });
     }
 
     const numericAmount = Number(amount);
     if (Number.isNaN(numericAmount) || numericAmount < 0) {
       return res.status(400).json({ error: 'amount must be a non-negative number' });
+    }
+
+    // Check if the ref_num already exists for the given client_id
+    const { data: existingSale, error: existingSaleError } = await supabase
+      .from('sales')
+      .select('ref_num')
+      .eq('ref_num', ref_num)
+      .eq('client_id', client_id)
+      .single();
+
+    if (existingSale) {
+      return res.status(409).json({ error: 'Reference number already exists' });
     }
 
     // Access control: if store_id provided, ensure user has access to that store's client
@@ -87,6 +100,7 @@ router.post('/', authenticateToken as any, async (req: any, res) => {
       .from('sales')
       .insert([
         {
+          ref_num, // Added ref_num
           client_id,
           ...(store_id && { store_id }),
           user_id: req.user?.id || null,
@@ -94,7 +108,7 @@ router.post('/', authenticateToken as any, async (req: any, res) => {
           payment_method: payment_method || null,
           amount: numericAmount,
           sales_date,
-          supporting_docs_bucket: publicUrl,
+          supp_doc_url: publicUrl,
         }
       ])
       .select('*')
@@ -112,9 +126,9 @@ router.post('/', authenticateToken as any, async (req: any, res) => {
   }
 });
 
-router.put('/:saleId', authenticateToken as any, async (req: any, res) => {
+router.put('/:refNum', authenticateToken as any, async (req: any, res) => {
   try {
-    const { saleId } = req.params;
+    const { refNum } = req.params;
     const {
       store_id,
       description,
@@ -131,7 +145,7 @@ router.put('/:saleId', authenticateToken as any, async (req: any, res) => {
     const { data: existingSale, error: fetchError } = await supabase
       .from('sales')
       .select('client_id, store_id')
-      .eq('id', saleId)
+      .eq('ref_num', refNum)
       .single();
 
     if (fetchError || !existingSale) {
@@ -151,7 +165,7 @@ router.put('/:saleId', authenticateToken as any, async (req: any, res) => {
         amount: numericAmount,
         sales_date,
       })
-      .eq('id', saleId)
+      .eq('ref_num', refNum)
       .select('*')
       .single();
 
@@ -180,6 +194,7 @@ router.get('/client/:clientId', authenticateToken as any, async (req: any, res) 
     let query = supabase
       .from('sales')
       .select(`
+        ref_num,
         *,
         stores (name)
       `)
@@ -220,14 +235,14 @@ router.get('/client/:clientId', authenticateToken as any, async (req: any, res) 
   }
 });
 
-router.delete('/:saleId', authenticateToken as any, async (req: any, res) => {
+router.delete('/:refNum', authenticateToken as any, async (req: any, res) => {
   try {
-    const { saleId } = req.params;
+    const { refNum } = req.params;
 
     const { data: existingSale, error: fetchError } = await supabase
       .from('sales')
       .select('client_id')
-      .eq('id', saleId)
+      .eq('ref_num', refNum)
       .single();
 
     if (fetchError || !existingSale) {
@@ -241,7 +256,7 @@ router.delete('/:saleId', authenticateToken as any, async (req: any, res) => {
     const { error: deleteError } = await supabase
       .from('sales')
       .delete()
-      .eq('id', saleId);
+      .eq('ref_num', refNum);
 
     if (deleteError) {
       console.error('Delete sale error:', deleteError);

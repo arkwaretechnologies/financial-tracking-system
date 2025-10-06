@@ -227,7 +227,7 @@ ALTER TABLE password_reset_tokens ENABLE ROW LEVEL SECURITY;
 
 -- Sales table for recording store sales
 CREATE TABLE sales (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    ref_num TEXT PRIMARY KEY,
     client_id UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
     store_id UUID REFERENCES stores(id) ON DELETE SET NULL,
     user_id UUID REFERENCES users(id) ON DELETE SET NULL,
