@@ -42,7 +42,7 @@ CREATE TABLE sales (
     description TEXT,
     payment_method TEXT,
     amount NUMERIC(10, 2) NOT NULL,
-    sales_date DATE NOT NULL,
+    sales_date TIMESTAMPTZ NOT NULL,
     supporting_docs_path TEXT,
     supporting_docs_bucket TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()

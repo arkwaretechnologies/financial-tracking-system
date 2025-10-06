@@ -281,6 +281,10 @@ class ApiClient {
   async deleteExpense(token: string, refNum: string): Promise<any> {
     return this.delete(`/expenses/${refNum}`, token);
   }
+
+  async getGrossIncome(token: string, clientId: string, startDate: string, endDate: string): Promise<{ data: { grossIncome: number, totalSales: number, totalPurchases: number, totalExpenses: number } }> {
+    return this.get(`/reports/gross-income?clientId=${clientId}&startDate=${startDate}&endDate=${endDate}`, token);
+  }
 }
 
 const apiClient = new ApiClient(API_BASE_URL);

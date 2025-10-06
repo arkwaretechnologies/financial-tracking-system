@@ -13,6 +13,7 @@ import rolesRoutes from './routes/roles';
 import salesRoutes from './routes/sales';
 import purchaseRoutes from './routes/purchases';
 import expenseRoutes from './routes/expenses';
+import reportsRoutes from './routes/reports';
 
 // Load environment variables
 dotenv.config();
@@ -44,6 +45,7 @@ app.use('/api/roles', rolesRoutes);
 app.use('/api/sales', salesRoutes);
 app.use('/api/purchases', purchaseRoutes);
 app.use('/api/expenses', expenseRoutes);
+app.use('/api/reports', reportsRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
