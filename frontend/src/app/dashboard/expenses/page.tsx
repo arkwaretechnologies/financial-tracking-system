@@ -17,6 +17,7 @@ export default function ExpensesPage() {
   const { currentStore } = useStore();
   const { user, token, selectedStore } = useAuth();
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [filteredExpenses, setFilteredExpenses] = useState<Expense[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [newExpense, setNewExpense] = useState({ 
     ref_num: '',
@@ -30,30 +31,60 @@ export default function ExpensesPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [searchRefNum, setSearchRefNum] = useState('');
+  const [searchDescription, setSearchDescription] = useState('');
 
   useEffect(() => {
     const fetchExpenses = async () => {
       if (user && token && selectedStore) {
         setIsLoading(true);
         try {
-          const response = await api.getExpenses(token, user.client_id, selectedStore);
+          const response = await api.getExpenses(token, user.client_id, selectedStore, '', '');
           console.log('Raw API response:', response);
-          if (Array.isArray(response.expenses)) {
-            setExpenses(response.expenses);
+          if (Array.isArray(response)) {
+            setExpenses(response);
+            setFilteredExpenses(response);
           } else {
             setExpenses([]);
+            setFilteredExpenses([]);
           }
         } catch (error) {
           console.error("Failed to fetch expenses:", error);
           setExpenses([]);
+          setFilteredExpenses([]);
         } finally {
           setIsLoading(false);
         }
       }
     };
 
-    fetchExpenses();
+    if (selectedStore) { // Only fetch if a store is selected
+      fetchExpenses();
+    } else {
+      // If no store is selected, don't show loading, just an empty state.
+      setIsLoading(false);
+      setExpenses([]);
+      setFilteredExpenses([]);
+    }
   }, [user, token, selectedStore]);
+
+  useEffect(() => {
+    let filtered = expenses;
+
+    if (searchRefNum) {
+      filtered = filtered.filter(expense =>
+        expense.ref_num.toLowerCase().includes(searchRefNum.toLowerCase())
+      );
+    }
+
+    if (searchDescription) {
+      filtered = filtered.filter(expense =>
+        expense.description.toLowerCase().includes(searchDescription.toLowerCase())
+      );
+    }
+
+    setFilteredExpenses(filtered);
+  }, [searchRefNum, searchDescription, expenses]);
 
   const handleCreateExpense = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -87,7 +118,9 @@ export default function ExpensesPage() {
       
       const newExpenseRecord = await api.createExpense(token, expenseData);
       if (newExpenseRecord) {
-        setExpenses([newExpenseRecord, ...expenses]);
+        const updatedExpenses = [newExpenseRecord, ...expenses];
+        setExpenses(updatedExpenses);
+        setFilteredExpenses(updatedExpenses);
       }
       setNewExpense({ 
         ref_num: '',
@@ -123,13 +156,15 @@ export default function ExpensesPage() {
 
     try {
       await api.deleteExpense(token, refNum);
-      setExpenses(expenses.filter(exp => exp.ref_num !== refNum));
+      const updatedExpenses = expenses.filter(exp => exp.ref_num !== refNum);
+      setExpenses(updatedExpenses);
+      setFilteredExpenses(updatedExpenses);
     } catch (error) {
       console.error('Error deleting expense:', error);
     }
   };
 
-  const totalExpenses = expenses.reduce((sum, expense) => sum + (expense.amount || 0), 0);
+  const totalExpenses = filteredExpenses.reduce((sum, expense) => sum + (expense.amount || 0), 0);
 
   if (isLoading) {
     return <div>Loading...</div>; // Or a spinner component
@@ -263,7 +298,7 @@ export default function ExpensesPage() {
         <CardContent>
           <div className="text-2xl font-bold">{new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(totalExpenses)}</div>
           <p className="text-xs text-muted-foreground">
-            {expenses.length} transactions recorded
+            {filteredExpenses.length} transactions recorded
           </p>
         </CardContent>
       </Card>
@@ -274,6 +309,18 @@ export default function ExpensesPage() {
           <CardDescription>A list of all expense transactions</CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="flex space-x-4 mb-4">
+            <Input
+              placeholder="Search by reference number..."
+              value={searchRefNum}
+              onChange={(e) => setSearchRefNum(e.target.value)}
+            />
+            <Input
+              placeholder="Search by description..."
+              value={searchDescription}
+              onChange={(e) => setSearchDescription(e.target.value)}
+            />
+          </div>
           <Table>
             <TableHeader>
               <TableRow>
@@ -289,7 +336,7 @@ export default function ExpensesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {expenses.map((expense) => (
+              {filteredExpenses.map((expense) => (
                 <TableRow key={expense.ref_num}>
                   <TableCell>{expense.ref_num}</TableCell>
                   <TableCell>{new Date(expense.expense_date).toLocaleDateString()}</TableCell>

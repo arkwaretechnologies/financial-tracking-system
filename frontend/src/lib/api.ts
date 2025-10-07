@@ -301,16 +301,16 @@ class ApiClient {
     return this.delete(`/purchases/${refNum}`, token);
   }
 
-  async getExpenses(token: string, clientId: string, storeId?: string): Promise<Expense[]> {
-    let url = `/expenses/client/${clientId}`;
-    if (storeId && storeId !== 'all') {
-      url += `?storeId=${storeId}`;
-    }
-    const response = await this.get<{ expenses: Expense[] }>(url, token);
-    return response.expenses;
+  async getExpenses(token: string, clientId: string, storeId: string, refNum?: string, description?: string): Promise<Expense[]> {
+    const params = new URLSearchParams();
+    if (refNum) params.append('refNum', refNum);
+    if (description) params.append('description', description);
+
+    const url = `/expenses/client/${clientId}/store/${storeId}?${params.toString()}`;
+    return this.get<Expense[]>(url, token);
   }
 
-  async createExpense(token: string, data: CreateExpenseRequest) {
+  async createExpense(token: string, data: CreateExpenseRequest): Promise<Expense> {
     return this.post<Expense>('/expenses', data, token);
   }
 

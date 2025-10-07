@@ -27,7 +27,7 @@ interface AuthContextType {
   token: string | null;
   stores: any[];
   selectedStore: string | null;
-  setSelectedStore: (storeId: string) => void;
+  setSelectedStore: (storeId: string | null) => void;
   login: (clientId: string, usernameOrEmail: string, password: string) => Promise<void>;
   logout: () => void;
   loading: boolean;
@@ -39,14 +39,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [stores, setStores] = useState<any[]>([]);
-  const [selectedStore, setSelectedStore] = useState<string | null>(null);
+  const [selectedStore, _setSelectedStore] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+
+  const setSelectedStore = (storeId: string | null) => {
+    _setSelectedStore(storeId);
+    if (storeId) {
+      localStorage.setItem('selectedStore', storeId);
+    } else {
+      localStorage.removeItem('selectedStore');
+    }
+  };
 
   useEffect(() => {
     const storedToken = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
     const storedStores = localStorage.getItem('stores');
+    const storedSelectedStore = localStorage.getItem('selectedStore');
 
     if (storedToken && storedUser) {
       const parsedUser = JSON.parse(storedUser);
@@ -57,8 +67,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setStores(JSON.parse(storedStores));
       }
 
-      // Set selectedStore based on user's store_id or default to 'all'
-      if (parsedUser.store_id) {
+      if (storedSelectedStore) {
+        _setSelectedStore(storedSelectedStore);
+      } else if (parsedUser.store_id) {
         setSelectedStore(parsedUser.store_id);
       } else if (storedStores) {
         const stores = JSON.parse(storedStores);
@@ -75,7 +86,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     setLoading(false);
-  }, [router]);
+  }, []);
 
   const login = async (clientId: string, usernameOrEmail: string, password: string): Promise<void> => {
     try {
@@ -130,6 +141,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       setUser(userData);
       setToken(response.token);
+      setStores(clientStores);
       
       // Safely store in localStorage with error handling
       try {
@@ -138,6 +150,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem('stores', JSON.stringify(clientStores));
       } catch (storageError) {
         console.warn('Failed to store authentication data in localStorage:', storageError);
+      }
+
+      if (userData.store_id) {
+        setSelectedStore(userData.store_id);
+      } else if (clientStores.length > 0) {
+        setSelectedStore('all');
+      } else {
+        setSelectedStore(null);
       }
       
       // Redirect to dashboard
@@ -157,6 +177,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('stores');
+    localStorage.removeItem('selectedStore');
     router.push('/login');
   };
 

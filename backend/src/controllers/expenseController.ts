@@ -2,29 +2,38 @@ import { Request, Response } from 'express';
 import { supabase } from '../config/supabase';
 
 export const getExpensesByClient = async (req: Request, res: Response) => {
-  const { clientId } = req.params;
-  const { storeId } = req.query;
+  const { clientId, storeId } = req.params;
+  const { refNum, description } = req.query;
 
   try {
     let query = supabase
       .from('expenses')
       .select(`
         ref_num,
+        expense_date,
         description,
         paid_to,
-        payment_method,
         amount,
-        expense_date,
+        payment_method,
         supp_doc_url,
         stores ( name )
       `)
-      .eq('client_id', clientId);
+      .eq('client_id', clientId)
+      .order('expense_date', { ascending: false });
 
-    if (storeId && storeId !== 'all') {
+    if (storeId !== 'all') {
       query = query.eq('store_id', storeId);
     }
 
-    const { data: expenses, error } = await query;
+    if (refNum && refNum !== "") {
+      query = query.ilike('ref_num', `%${refNum}%`);
+    }
+
+    if (description && description !== "") {
+      query = query.ilike('description', `%${description}%`);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       throw error;
@@ -32,7 +41,7 @@ export const getExpensesByClient = async (req: Request, res: Response) => {
 
     // The result from Supabase with a join includes the joined table as a nested object.
     // We need to flatten it to match the original structure.
-    const formattedExpenses = expenses.map((expense: any) => {
+    const formattedExpenses = data.map((expense: any) => {
       const { stores, ...rest } = expense;
       return {
         ...rest,
@@ -42,8 +51,9 @@ export const getExpensesByClient = async (req: Request, res: Response) => {
 
     console.log('Formatted Expenses:', formattedExpenses);
 
-    res.json({ expenses: formattedExpenses });
+    res.json(formattedExpenses);
   } catch (error) {
+    console.error("Error in getExpensesByClient:", error);
     res.status(500).json({ error: (error as Error).message });
   }
 };
