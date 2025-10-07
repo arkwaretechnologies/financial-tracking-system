@@ -27,15 +27,15 @@ interface Purchase {
 }
 
 export default function PurchasesPage() {
-  const { user, token } = useAuth();
+  const { user, token, selectedStore } = useAuth();
   const { currentStore } = useStore();
   const [purchases, setPurchases] = useState<Purchase[]>([]);
 
   useEffect(() => {
     const fetchPurchases = async () => {
-      if (token && user?.client_id) {
+      if (token && user?.client_id && selectedStore) {
         try {
-          const response = await api.getPurchases(token, user.client_id);
+          const response = await api.getPurchases(token, user.client_id, selectedStore);
           setPurchases(response.purchases);
         } catch (error) {
           console.error("Failed to fetch purchases:", error);
@@ -44,7 +44,7 @@ export default function PurchasesPage() {
     };
 
     fetchPurchases();
-  }, [token, user?.client_id]);
+  }, [token, user?.client_id, selectedStore]);
 
   const [newPurchase, setNewPurchase] = useState({ 
     ref_num: '',

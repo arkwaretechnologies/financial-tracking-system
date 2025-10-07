@@ -15,7 +15,7 @@ import { api, CreateExpenseRequest, Expense } from '@/lib/api';
 
 export default function ExpensesPage() {
   const { currentStore } = useStore();
-  const { user, token } = useAuth();
+  const { user, token, selectedStore } = useAuth();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [newExpense, setNewExpense] = useState({ 
@@ -33,10 +33,10 @@ export default function ExpensesPage() {
 
   useEffect(() => {
     const fetchExpenses = async () => {
-      if (currentStore && token) {
+      if (user && token && selectedStore) {
         setIsLoading(true);
         try {
-          const response = await api.getExpenses(token, currentStore.client_id);
+          const response = await api.getExpenses(token, user.client_id, selectedStore);
           console.log('Raw API response:', response);
           if (Array.isArray(response.expenses)) {
             setExpenses(response.expenses);
@@ -53,7 +53,7 @@ export default function ExpensesPage() {
     };
 
     fetchExpenses();
-  }, [currentStore, token]);
+  }, [user, token, selectedStore]);
 
   const handleCreateExpense = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();

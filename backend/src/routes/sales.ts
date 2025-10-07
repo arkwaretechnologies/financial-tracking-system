@@ -200,7 +200,7 @@ router.get('/client/:clientId', authenticateToken as any, async (req: any, res) 
       `)
       .eq('client_id', clientId);
 
-    if (storeId) {
+    if (storeId && storeId !== 'all') {
       query = query.eq('store_id', storeId);
     }
 

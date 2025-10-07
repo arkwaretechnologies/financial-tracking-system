@@ -21,7 +21,7 @@ export const getPurchasesByClient = async (req: any, res: Response) => {
       `)
       .eq('client_id', clientId);
 
-    if (storeId) {
+    if (storeId && storeId !== 'all') {
       query = query.eq('store_id', storeId);
     }
 

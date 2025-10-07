@@ -3,9 +3,10 @@ import { supabase } from '../config/supabase';
 
 export const getExpensesByClient = async (req: Request, res: Response) => {
   const { clientId } = req.params;
+  const { storeId } = req.query;
 
   try {
-    const { data: expenses, error } = await supabase
+    let query = supabase
       .from('expenses')
       .select(`
         ref_num,
@@ -18,6 +19,12 @@ export const getExpensesByClient = async (req: Request, res: Response) => {
         stores ( name )
       `)
       .eq('client_id', clientId);
+
+    if (storeId && storeId !== 'all') {
+      query = query.eq('store_id', storeId);
+    }
+
+    const { data: expenses, error } = await query;
 
     if (error) {
       throw error;

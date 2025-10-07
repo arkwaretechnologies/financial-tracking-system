@@ -242,16 +242,24 @@ class ApiClient {
     return this.delete(`/sales/${refNum}`, token);
   }
 
-  async getSalesByClient(token: string, clientId: string): Promise<{ sales: any[] }> {
-    return this.get(`/sales/client/${clientId}`, token);
+  async getSalesByClient(token: string, clientId: string, storeId?: string): Promise<{ sales: any[] }> {
+    let url = `/sales/client/${clientId}`;
+    if (storeId && storeId !== 'all') {
+      url += `?storeId=${storeId}`;
+    }
+    return this.get(url, token);
   }
 
   async getStoresByClient(token: string, clientId: string): Promise<{ stores: any[] }> {
     return this.get(`/stores/client/${clientId}`, token);
   }
 
-  async getPurchases(token: string, clientId: string): Promise<{ purchases: any[] }> {
-    return this.get(`/purchases/client/${clientId}`, token);
+  async getPurchases(token: string, clientId: string, storeId?: string): Promise<{ purchases: any[] }> {
+    let url = `/purchases/client/${clientId}`;
+    if (storeId && storeId !== 'all') {
+      url += `?storeId=${storeId}`;
+    }
+    return this.get(url, token);
   }
 
   async createPurchase(token: string, purchaseData: CreatePurchaseRequest): Promise<any> {
@@ -266,12 +274,16 @@ class ApiClient {
     return this.delete(`/purchases/${refNum}`, token);
   }
 
-  async getExpenses(token: string, clientId: string): Promise<{ expenses: Expense[] }> {
-    return this.get(`/expenses/client/${clientId}`, token);
+  async getExpenses(token: string, clientId: string, storeId?: string) {
+    let url = `/expenses/client/${clientId}`;
+    if (storeId) {
+      url += `?storeId=${storeId}`;
+    }
+    return this.get<{ expenses: Expense[] }>(url, token);
   }
 
-  async createExpense(token: string, expenseData: CreateExpenseRequest): Promise<any> {
-    return this.post('/expenses', expenseData, token);
+  async createExpense(token: string, data: CreateExpenseRequest) {
+    return this.post<Expense>('/expenses', data, token);
   }
 
   async updateExpense(token: string, refNum: string, expenseData: Partial<CreateExpenseRequest>): Promise<any> {

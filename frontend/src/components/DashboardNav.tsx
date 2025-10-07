@@ -35,7 +35,7 @@ interface NavItem {
 }
 
 export default function DashboardNav() {
-  const { user, logout } = useAuth();
+  const { user, logout, setSelectedStore } = useAuth();
   const { stores, currentStore, setCurrentStore } = useStore();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -91,7 +91,10 @@ export default function DashboardNav() {
             value={currentStore?.id?.toString() || ""}
             onValueChange={(value) => {
               const store = stores.find(s => s.id.toString() === value);
-              if (store) setCurrentStore(store);
+              if (store) {
+                setCurrentStore(store)
+                setSelectedStore(store.id)
+              };
             }}
           >
             <SelectTrigger className="w-full bg-gray-50 border-gray-200">

@@ -26,6 +26,8 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   stores: any[];
+  selectedStore: string | null;
+  setSelectedStore: (storeId: string) => void;
   login: (clientId: string, usernameOrEmail: string, password: string) => Promise<void>;
   logout: () => void;
   loading: boolean;
@@ -37,6 +39,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [stores, setStores] = useState<any[]>([]);
+  const [selectedStore, setSelectedStore] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
@@ -45,7 +48,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const storedUser = localStorage.getItem('user');
     if (storedToken && storedUser) {
       setToken(storedToken);
-      setUser(JSON.parse(storedUser));
+      const parsedUser = JSON.parse(storedUser);
+      setUser(parsedUser);
+      if (parsedUser.store_id) {
+        setSelectedStore(parsedUser.store_id);
+      }
     }
     setLoading(false);
   }, []);
@@ -126,6 +133,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(null);
     setUser(null);
     setStores([]);
+    setSelectedStore(null);
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('stores');
@@ -133,7 +141,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, stores, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, token, stores, selectedStore, setSelectedStore, login, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );

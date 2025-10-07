@@ -26,7 +26,7 @@ interface Sale {
 
 export default function SalesPage() {
   const [sales, setSales] = useState<Sale[]>([]);
-  const { user, token } = useAuth();
+  const { user, token, selectedStore } = useAuth();
   const [newSale, setNewSale] = useState({
     ref_num: '',
     date: new Date().toISOString().split('T')[0],
@@ -42,7 +42,7 @@ export default function SalesPage() {
     const fetchSales = async () => {
       if (token && user?.client_id) {
         try {
-          const response = await api.getSalesByClient(token, user.client_id);
+          const response = await api.getSalesByClient(token, user.client_id, selectedStore || 'all');
           setSales(response.sales);
         } catch (error) {
           console.error('Failed to fetch sales:', error);
@@ -52,7 +52,7 @@ export default function SalesPage() {
     };
 
     fetchSales();
-  }, [token, user?.client_id]);
+  }, [token, user?.client_id, selectedStore]);
 
   // Mock stores data
   const stores = [
