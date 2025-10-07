@@ -210,15 +210,15 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <Button className="w-full" variant="default" onClick={() => router.push('/dashboard/sales')}>
-              <DollarSign className="mr-2 h-4 w-4" />
+              <PhilippinePeso className="mr-2 h-4 w-4" />
               Record New Sale
             </Button>
             <Button className="w-full" variant="outline" onClick={() => router.push('/dashboard/purchases')}>
-              <TrendingUp className="mr-2 h-4 w-4" />
+              <ShoppingCart className="mr-2 h-4 w-4" />
               Record Purchase
             </Button>
             <Button className="w-full" variant="outline" onClick={() => router.push('/dashboard/expenses')}>
-              <DollarSign className="mr-2 h-4 w-4" />
+              <Banknote className="mr-2 h-4 w-4" />
               Record Expense
             </Button>
             <Button className="w-full" variant="outline" onClick={() => router.push('/dashboard/reports')}>
