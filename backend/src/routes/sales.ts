@@ -184,7 +184,7 @@ router.put('/:refNum', authenticateToken as any, async (req: any, res) => {
 router.get('/client/:clientId', authenticateToken as any, async (req: any, res) => {
   try {
     const { clientId } = req.params;
-    const { startDate, endDate, storeId } = req.query;
+    const { storeId, searchRefNum, searchDescription, page = 1, pageSize = 10 } = req.query;
 
     // Access control: Ensure user has access to this client's data
     if (req.user?.role !== 'super_admin' && req.user?.client_id !== clientId) {
@@ -198,23 +198,30 @@ router.get('/client/:clientId', authenticateToken as any, async (req: any, res) 
         *,
         stores (name)
       `)
-      .eq('client_id', clientId);
+      .eq('client_id', clientId)
+      .order('sales_date', { ascending: false });
 
     if (storeId && storeId !== 'all') {
       query = query.eq('store_id', storeId);
     }
 
-    if (startDate) {
-      query = query.gte('sales_date', startDate);
+    if (searchRefNum) {
+      query = query.ilike('ref_num', `%${searchRefNum}%`);
     }
 
-    if (endDate) {
-      query = query.lte('sales_date', endDate);
+    if (searchDescription) {
+      query = query.ilike('description', `%${searchDescription}%`);
     }
 
-    query = query.order('sales_date', { ascending: false });
+    // Pagination
+    const pageInt = parseInt(page as string, 10);
+    const pageSizeInt = parseInt(pageSize as string, 10);
+    const start = (pageInt - 1) * pageSizeInt;
+    const end = start + pageSizeInt - 1;
 
-    const { data: sales, error } = await query;
+    query = query.range(start, end);
+
+    const { data, error, count } = await query;
 
     if (error) {
       console.error('Get sales error:', error);
@@ -222,13 +229,13 @@ router.get('/client/:clientId', authenticateToken as any, async (req: any, res) 
     }
 
     // Transform the data to include store_name at the top level
-    const transformedSales = sales.map((sale: any) => ({
+    const transformedSales = data.map((sale: any) => ({
       ...sale,
       store_name: sale.stores ? sale.stores.name : null,
       stores: undefined, // Remove the nested stores object
     }));
 
-    return res.status(200).json({ sales: transformedSales });
+    return res.status(200).json({ sales: transformedSales, count });
   } catch (err: any) {
     console.error('Get sales route error:', err);
     return res.status(500).json({ error: 'Internal server error' });

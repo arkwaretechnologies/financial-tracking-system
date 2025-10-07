@@ -4,7 +4,9 @@ import { supabase } from '../config/supabase';
 export const getPurchasesByClient = async (req: any, res: Response) => {
   try {
     const { clientId } = req.params;
-    const { startDate, endDate, storeId } = req.query;
+    const { startDate, endDate, storeId, refNum, description, page = 1, pageSize = 10 } = req.query;
+
+    console.log('Search parameters:', req.query);
 
     // Access control: Ensure user has access to this client's data
     if (req.user?.role !== 'super_admin' && req.user?.client_id !== clientId) {
@@ -25,6 +27,14 @@ export const getPurchasesByClient = async (req: any, res: Response) => {
       query = query.eq('store_id', storeId);
     }
 
+    if (refNum) {
+      query = query.ilike('ref_num', `%${refNum}%`);
+    }
+
+    if (description) {
+      query = query.ilike('description', `%${description}%`);
+    }
+
     if (startDate) {
       query = query.gte('purchase_date', startDate);
     }
@@ -33,9 +43,14 @@ export const getPurchasesByClient = async (req: any, res: Response) => {
       query = query.lte('purchase_date', endDate);
     }
 
+    const offset = (page - 1) * pageSize;
+    query = query.range(offset, offset + pageSize - 1);
+    
     query = query.order('purchase_date', { ascending: false });
 
-    const { data: purchases, error } = await query;
+    console.log('Constructed query:', query);
+
+    const { data: purchases, error, count } = await query;
 
     if (error) {
       console.error('Get purchases error:', error);
@@ -49,7 +64,7 @@ export const getPurchasesByClient = async (req: any, res: Response) => {
       stores: undefined, // Remove the nested stores object
     }));
 
-    return res.status(200).json({ purchases: transformedPurchases });
+    return res.status(200).json({ purchases: transformedPurchases, count });
   } catch (err: any) {
     console.error('Get purchases route error:', err);
     return res.status(500).json({ error: 'Internal server error' });

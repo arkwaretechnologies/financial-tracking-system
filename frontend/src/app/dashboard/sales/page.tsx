@@ -20,7 +20,7 @@ interface Sale {
   amount: number;
   description: string;
   store_name: string;
-  payment_method: 'cash' | 'card' | 'transfer';
+  payment_method: string;
   supp_doc_url?: string;
 }
 
@@ -37,13 +37,19 @@ export default function SalesPage() {
   const [saleDocument, setSaleDocument] = useState<File | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSale, setEditingSale] = useState<Sale | null>(null);
+  const [searchRefNum, setSearchRefNum] = useState('');
+  const [searchDescription, setSearchDescription] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   useEffect(() => {
     const fetchSales = async () => {
       if (token && user?.client_id) {
         try {
-          const response = await api.getSalesByClient(token, user.client_id, selectedStore || 'all');
+          const response = await api.getSalesByClient(token, user.client_id, selectedStore || 'all', searchRefNum, searchDescription, currentPage, pageSize);
           setSales(response.sales);
+          setTotalPages(Math.ceil(response.count / pageSize));
         } catch (error) {
           console.error('Failed to fetch sales:', error);
           // Optionally, show an error message to the user
@@ -52,7 +58,7 @@ export default function SalesPage() {
     };
 
     fetchSales();
-  }, [token, user?.client_id, selectedStore]);
+  }, [token, user?.client_id, selectedStore, searchRefNum, searchDescription, currentPage, pageSize]);
 
   // Mock stores data
   const stores = [
@@ -257,6 +263,8 @@ export default function SalesPage() {
         </Dialog>
       </div>
 
+
+
       {/* Edit Sale Dialog */}
       <Dialog open={!!editingSale} onOpenChange={() => setEditingSale(null)}>
         <DialogContent>
@@ -352,16 +360,32 @@ export default function SalesPage() {
           <CardDescription>A list of all sales transactions</CardDescription>
         </CardHeader>
         <CardContent>
+          {/* Search and Filter UI */}
+          <div className="flex items-center space-x-4 mb-4">
+            <div className="flex-1">
+              <Input
+                placeholder="Search by reference number..."
+                value={searchRefNum}
+                onChange={(e) => setSearchRefNum(e.target.value)}
+              />
+            </div>
+            <div className="flex-1">
+              <Input
+                placeholder="Search by description..."
+                value={searchDescription}
+                onChange={(e) => setSearchDescription(e.target.value)}
+              />
+            </div>
+          </div>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Reference Number</TableHead>
+                <TableHead>Reference No.</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Description</TableHead>
-                <TableHead>Store</TableHead>
+                <TableHead>Amount</TableHead>
                 <TableHead>Payment Method</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead>Document</TableHead>
+                <TableHead>Store</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -369,7 +393,7 @@ export default function SalesPage() {
               {sales.map((sale) => (
                 <TableRow key={sale.ref_num}>
                   <TableCell>{sale.ref_num}</TableCell>
-                  <TableCell>{new Date(sale.sales_date.replace(/-/g, '/')).toLocaleDateString()}</TableCell>
+                  <TableCell>{new Date(sale.sales_date).toLocaleDateString()}</TableCell>
                   <TableCell>{sale.description}</TableCell>
                   <TableCell>{sale.store_name || 'N/A'}</TableCell>
                   <TableCell>
@@ -399,6 +423,24 @@ export default function SalesPage() {
               ))}
             </TableBody>
           </Table>
+          <div className="flex items-center justify-end space-x-2 py-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+            >
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+            >
+              Next
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>

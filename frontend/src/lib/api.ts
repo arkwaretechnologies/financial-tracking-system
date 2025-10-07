@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
 interface LoginRequest {
   client_id: string;
@@ -127,6 +127,28 @@ export interface Expense {
   supp_doc_url?: string;
 }
 
+export interface Purchase {
+  ref_num: string;
+  purchase_date: string;
+  amount: number;
+  description: string;
+  supplier: string;
+  store_name: string;
+  payment_method: string;
+  supp_doc_url?: string;
+  category?: string;
+}
+
+export interface Sale {
+  ref_num: string;
+  sales_date: string;
+  amount: number;
+  description: string;
+  store_name: string;
+  payment_method: string;
+  supp_doc_url?: string;
+}
+
 class ApiClient {
   private baseUrl: string;
 
@@ -224,6 +246,10 @@ class ApiClient {
     return this.get(`/users/client/${clientId}`, token);
   }
 
+  async getStoresByClient(token: string, clientId: string): Promise<{ stores: any[] }> {
+    return this.get(`/stores/client/${clientId}`, token);
+  }
+
   async createUser(token: string, userData: CreateUserRequest): Promise<{ user: User; message: string }> {
     return this.post('/users', userData, token);
   }
@@ -241,19 +267,60 @@ class ApiClient {
     return this.delete(`/sales/${refNum}`, token);
   }
 
-  async getSalesByClient(token: string, clientId: string, storeId?: string): Promise<{ sales: any[] }> {
-    let url = `/sales/client/${clientId}`;
+  async getSalesByClient(token: string, clientId: string, storeId: string, searchRefNum?: string, searchDescription?: string, page?: number, pageSize?: number): Promise<{ sales: Sale[], count: number }> {
+    const query = new URLSearchParams();
+    if (storeId) query.append('storeId', storeId);
+    if (searchRefNum) query.append('searchRefNum', searchRefNum);
+    if (searchDescription) query.append('searchDescription', searchDescription);
+    if (page) query.append('page', page.toString());
+    if (pageSize) query.append('pageSize', pageSize.toString());
+
+    return this.get(`/sales/client/${clientId}?${query.toString()}`, token);
+  }
+
+  async getPurchasesByClient(token: string, clientId: string, storeId: string, refNum?: string, description?: string, page?: number, pageSize?: number): Promise<{ purchases: Purchase[], count: number }> {
+    const query = new URLSearchParams();
+    if (storeId) query.append('storeId', storeId);
+    if (refNum) query.append('refNum', refNum);
+    if (description) query.append('description', description);
+    if (page) query.append('page', page.toString());
+    if (pageSize) query.append('pageSize', pageSize.toString());
+
+    return this.get(`/purchases/client/${clientId}?${query.toString()}`, token);
+  }
+
+  async createPurchase(token: string, purchaseData: CreatePurchaseRequest): Promise<{ purchase: any; image_path?: string; message: string }> {
+    return this.post('/purchases', purchaseData, token);
+  }
+
+  async updatePurchase(token: string, refNum: string, data: Partial<CreatePurchaseRequest>): Promise<any> {
+    return this.put(`/purchases/${refNum}`, data, token);
+  }
+
+  async deletePurchase(token: string, refNum: string): Promise<any> {
+    return this.delete(`/purchases/${refNum}`, token);
+  }
+
+  async getExpenses(token: string, clientId: string, storeId?: string): Promise<Expense[]> {
+    let url = `/expenses/client/${clientId}`;
     if (storeId && storeId !== 'all') {
       url += `?storeId=${storeId}`;
     }
-    return this.get(url, token);
+    const response = await this.get<{ expenses: Expense[] }>(url, token);
+    return response.expenses;
   }
 
-  async getStoresByClient(token: string, clientId: string): Promise<{ stores: any[] }> {
-    return this.get(`/stores/client/${clientId}`, token);
+  async createExpense(token: string, data: CreateExpenseRequest) {
+    return this.post<Expense>('/expenses', data, token);
   }
 
+  async updateExpense(token: string, refNum: string, expenseData: Partial<CreateExpenseRequest>): Promise<any> {
+    return this.put(`/expenses/${refNum}`, expenseData, token);
+  }
 
+  async deleteExpense(token: string, refNum: string): Promise<any> {
+    return this.delete(`/expenses/${refNum}`, token);
+  }
 
   async getGrossIncome(token: string, clientId: string, startDate: string, endDate: string, store_id?: string): Promise<any> {
     let url = `/reports/gross-income?clientId=${clientId}&startDate=${startDate}&endDate=${endDate}`;
@@ -293,47 +360,6 @@ class ApiClient {
       url += `&store_id=${store_id}`;
     }
     return this.get(url, token);
-  }
-
-  async getPurchases(token: string, clientId: string, storeId?: string): Promise<any[]> {
-    let url = `/purchases/client/${clientId}`;
-    if (storeId && storeId !== 'all') {
-      url += `?storeId=${storeId}`;
-    }
-    return this.get(url, token);
-  }
-
-  async createPurchase(token: string, data: CreatePurchaseRequest): Promise<any> {
-    return this.post('/purchases', data, token);
-  }
-
-  async updatePurchase(token: string, refNum: string, data: Partial<CreatePurchaseRequest>): Promise<any> {
-    return this.put(`/purchases/${refNum}`, data, token);
-  }
-
-  async deletePurchase(token: string, refNum: string): Promise<any> {
-    return this.delete(`/purchases/${refNum}`, token);
-  }
-
-  async getExpenses(token: string, clientId: string, storeId?: string): Promise<Expense[]> {
-    let url = `/expenses/client/${clientId}`;
-    if (storeId && storeId !== 'all') {
-      url += `?storeId=${storeId}`;
-    }
-    const response = await this.get<{ expenses: Expense[] }>(url, token);
-    return response.expenses;
-  }
-
-  async createExpense(token: string, data: CreateExpenseRequest) {
-    return this.post<Expense>('/expenses', data, token);
-  }
-
-  async updateExpense(token: string, refNum: string, expenseData: Partial<CreateExpenseRequest>): Promise<any> {
-    return this.put(`/expenses/${refNum}`, expenseData, token);
-  }
-
-  async deleteExpense(token: string, refNum: string): Promise<any> {
-    return this.delete(`/expenses/${refNum}`, token);
   }
 
   async getTotalExpenses(token: string, clientId: string, store_id?: string): Promise<{ totalExpenses: number }> {

@@ -20,9 +20,9 @@ interface Purchase {
   amount: number;
   description: string;
   supplier: string;
-  payment_method: 'cash' | 'card' | 'check';
+  payment_method: string;
   supp_doc_url?: string;
-  category: string;
+  category?: string;
   other_category?: string;
 }
 
@@ -30,13 +30,28 @@ export default function PurchasesPage() {
   const { user, token, selectedStore } = useAuth();
   const { currentStore } = useStore();
   const [purchases, setPurchases] = useState<Purchase[]>([]);
+  const [searchRefNum, setSearchRefNum] = useState('');
+  const [searchDescription, setSearchDescription] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const pageSize = 10;
 
   useEffect(() => {
     const fetchPurchases = async () => {
       if (token && user?.client_id && selectedStore) {
+        console.log('Fetching purchases for store:', selectedStore);
         try {
-          const response = await api.getPurchases(token, user.client_id, selectedStore);
+          const response = await api.getPurchasesByClient(
+            token,
+            user.client_id,
+            selectedStore,
+            searchRefNum,
+            searchDescription,
+            currentPage,
+            pageSize
+          );
           setPurchases(response.purchases);
+          setTotalPages(Math.ceil(response.count / pageSize));
         } catch (error) {
           console.error("Failed to fetch purchases:", error);
         }
@@ -44,7 +59,7 @@ export default function PurchasesPage() {
     };
 
     fetchPurchases();
-  }, [token, user?.client_id, selectedStore]);
+  }, [token, user?.client_id, selectedStore, searchRefNum, searchDescription, currentPage]);
 
   const [newPurchase, setNewPurchase] = useState({ 
     ref_num: '',
@@ -432,6 +447,18 @@ export default function PurchasesPage() {
           <CardDescription>A list of all purchase transactions</CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="flex space-x-4 mb-4">
+            <Input
+              placeholder="Search by reference no."
+              value={searchRefNum}
+              onChange={(e) => setSearchRefNum(e.target.value)}
+            />
+            <Input
+              placeholder="Search by description"
+              value={searchDescription}
+              onChange={(e) => setSearchDescription(e.target.value)}
+            />
+          </div>
           <Table>
             <TableHeader>
               <TableRow>
@@ -453,27 +480,112 @@ export default function PurchasesPage() {
                   <TableCell>{purchase.description}</TableCell>
                   <TableCell>{purchase.supplier}</TableCell>
                   <TableCell>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${purchase.payment_method === 'cash' ? 'bg-green-100 text-green-800' : purchase.payment_method === 'card' ? 'bg-blue-100 text-blue-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      purchase.payment_method === 'cash' ? 'bg-green-100 text-green-800' :
+                      purchase.payment_method === 'card' ? 'bg-blue-100 text-blue-800' :
+                      'bg-yellow-100 text-yellow-800'
+                    }`}>
                       {purchase.payment_method.toUpperCase()}
                     </span>
                   </TableCell>
-                  <TableCell className="text-right font-medium text-red-600">
-                    {new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(purchase.amount)}
-                  </TableCell>
+                  <TableCell>₱{purchase.amount.toLocaleString()}</TableCell>
                   <TableCell>
                     {purchase.supp_doc_url && (
                       <a href={purchase.supp_doc_url} target="_blank" rel="noopener noreferrer">
-                        <img src={purchase.supp_doc_url} alt="Purchase Document" className="h-10 w-10 object-cover" />
+                        <img src={purchase.supp_doc_url} alt="Document" style={{ width: '50px', height: 'auto' }} />
                       </a>
                     )}
                   </TableCell>
                   <TableCell>
-                    <Button variant="outline" size="sm" className="mr-2" onClick={() => setEditingPurchase(purchase)}>
-                      Edit
-                    </Button>
-                    <Button variant="destructive" size="sm" onClick={() => setDeletingPurchase(purchase)}>
-                      Delete
-                    </Button>
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" size="sm" onClick={() => setEditingPurchase(purchase)}>Edit</Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Edit Purchase</DialogTitle>
+                        </DialogHeader>
+                        {editingPurchase && (
+                          <div className="grid gap-4 py-4">
+                            <div className="grid grid-cols-4 items-center gap-4">
+                              <Label>Reference No.</Label>
+                              <Input value={editingPurchase.ref_num} readOnly className="col-span-3" />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                              <Label>Date</Label>
+                              <Input 
+                                type="date" 
+                                value={editingPurchase.purchase_date.split('T')[0]} 
+                                onChange={(e) => setEditingPurchase({ ...editingPurchase, purchase_date: e.target.value })}
+                                className="col-span-3" 
+                              />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                              <Label>Description</Label>
+                              <Input 
+                                value={editingPurchase.description} 
+                                onChange={(e) => setEditingPurchase({ ...editingPurchase, description: e.target.value })}
+                                className="col-span-3" 
+                              />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                              <Label>Supplier</Label>
+                              <Input 
+                                value={editingPurchase.supplier} 
+                                onChange={(e) => setEditingPurchase({ ...editingPurchase, supplier: e.target.value })}
+                                className="col-span-3" 
+                              />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                              <Label>Amount</Label>
+                              <Input 
+                                type="number" 
+                                value={editingPurchase.amount} 
+                                onChange={(e) => setEditingPurchase({ ...editingPurchase, amount: Number(e.target.value) })}
+                                className="col-span-3" 
+                              />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                              <Label>Payment Method</Label>
+                              <Select 
+                                value={editingPurchase.payment_method} 
+                                onValueChange={(value) => setEditingPurchase({ ...editingPurchase, payment_method: value as any })}
+                              >
+                                <SelectTrigger className="col-span-3">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="cash">Cash</SelectItem>
+                                  <SelectItem value="card">Card</SelectItem>
+                                  <SelectItem value="check">Check</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                        )}
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setEditingPurchase(null)}>Cancel</Button>
+                          <Button onClick={handleUpdatePurchase}>Save Changes</Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button variant="destructive" size="sm" className="ml-2" onClick={() => setDeletingPurchase(purchase)}>Delete</Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Confirm Deletion</DialogTitle>
+                          <DialogDescription>
+                            Are you sure you want to delete this purchase? This action cannot be undone.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setDeletingPurchase(null)}>Cancel</Button>
+                          <Button variant="destructive" onClick={handleDeletePurchase}>Delete</Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
                   </TableCell>
                 </TableRow>
               ))}
