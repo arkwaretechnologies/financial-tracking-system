@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002/api';
 
 interface LoginRequest {
   client_id: string;
@@ -144,7 +144,7 @@ class ApiClient {
       ...options,
       headers: {
         'Content-Type': 'application/json',
-        ...options.headers,
+        ...(options.headers || {}),
       },
     };
 
@@ -161,9 +161,8 @@ class ApiClient {
       }
       throw new Error(errorMessage);
     }
-
-    return response.json();
-  }
+  return response.json();
+}
 
   private async get<T>(endpoint: string, token?: string): Promise<T> {
     const headers: HeadersInit = {};
@@ -254,7 +253,49 @@ class ApiClient {
     return this.get(`/stores/client/${clientId}`, token);
   }
 
-  async getPurchases(token: string, clientId: string, storeId?: string): Promise<{ purchases: any[] }> {
+
+
+  async getGrossIncome(token: string, clientId: string, startDate: string, endDate: string, store_id?: string): Promise<any> {
+    let url = `/reports/gross-income?clientId=${clientId}&startDate=${startDate}&endDate=${endDate}`;
+    if (store_id && store_id !== 'all') {
+      url += `&store_id=${store_id}`;
+    }
+    return this.get(url, token);
+  }
+
+  async getTotalSales(token: string, clientId: string, store_id?: string): Promise<{ totalSales: number }> {
+    let url = `/reports/total-sales?clientId=${clientId}`;
+    if (store_id && store_id !== 'all') {
+      url += `&store_id=${store_id}`;
+    }
+    return this.get(url, token);
+  }
+
+  async getTotalSalesByDate(token: string, clientId: string, startDate: string, endDate: string, store_id?: string): Promise<{ totalSales: number }> {
+    let url = `/reports/total-sales-by-date?clientId=${clientId}&startDate=${startDate}&endDate=${endDate}`;
+    if (store_id && store_id !== 'all') {
+      url += `&store_id=${store_id}`;
+    }
+    return this.get(url, token);
+  }
+
+  async getTotalPurchases(token: string, clientId: string, store_id?: string): Promise<{ totalPurchases: number }> {
+    let url = `/reports/total-purchases?clientId=${clientId}`;
+    if (store_id && store_id !== 'all') {
+      url += `&store_id=${store_id}`;
+    }
+    return this.get(url, token);
+  }
+
+  async getTotalPurchasesByDate(token: string, clientId: string, startDate: string, endDate: string, store_id?: string): Promise<{ totalPurchases: number }> {
+    let url = `/reports/total-purchases-by-date?clientId=${clientId}&startDate=${startDate}&endDate=${endDate}`;
+    if (store_id && store_id !== 'all') {
+      url += `&store_id=${store_id}`;
+    }
+    return this.get(url, token);
+  }
+
+  async getPurchases(token: string, clientId: string, storeId?: string): Promise<any[]> {
     let url = `/purchases/client/${clientId}`;
     if (storeId && storeId !== 'all') {
       url += `?storeId=${storeId}`;
@@ -262,24 +303,25 @@ class ApiClient {
     return this.get(url, token);
   }
 
-  async createPurchase(token: string, purchaseData: CreatePurchaseRequest): Promise<any> {
-    return this.post('/purchases', purchaseData, token);
+  async createPurchase(token: string, data: CreatePurchaseRequest): Promise<any> {
+    return this.post('/purchases', data, token);
   }
 
-  async updatePurchase(token: string, refNum: string, purchaseData: Partial<CreatePurchaseRequest>): Promise<any> {
-    return this.put(`/purchases/${refNum}`, purchaseData, token);
+  async updatePurchase(token: string, refNum: string, data: Partial<CreatePurchaseRequest>): Promise<any> {
+    return this.put(`/purchases/${refNum}`, data, token);
   }
 
   async deletePurchase(token: string, refNum: string): Promise<any> {
     return this.delete(`/purchases/${refNum}`, token);
   }
 
-  async getExpenses(token: string, clientId: string, storeId?: string) {
+  async getExpenses(token: string, clientId: string, storeId?: string): Promise<Expense[]> {
     let url = `/expenses/client/${clientId}`;
-    if (storeId) {
+    if (storeId && storeId !== 'all') {
       url += `?storeId=${storeId}`;
     }
-    return this.get<{ expenses: Expense[] }>(url, token);
+    const response = await this.get<{ expenses: Expense[] }>(url, token);
+    return response.expenses;
   }
 
   async createExpense(token: string, data: CreateExpenseRequest) {
@@ -294,8 +336,20 @@ class ApiClient {
     return this.delete(`/expenses/${refNum}`, token);
   }
 
-  async getGrossIncome(token: string, clientId: string, startDate: string, endDate: string): Promise<{ data: { grossIncome: number, totalSales: number, totalPurchases: number, totalExpenses: number } }> {
-    return this.get(`/reports/gross-income?clientId=${clientId}&startDate=${startDate}&endDate=${endDate}`, token);
+  async getTotalExpenses(token: string, clientId: string, store_id?: string): Promise<{ totalExpenses: number }> {
+    let url = `/reports/total-expenses?clientId=${clientId}`;
+    if (store_id && store_id !== 'all') {
+      url += `&store_id=${store_id}`;
+    }
+    return this.get(url, token);
+  }
+
+  async getTotalExpensesByDate(token: string, clientId: string, startDate: string, endDate: string, store_id?: string): Promise<{ totalExpenses: number }> {
+    let url = `/reports/total-expenses-by-date?clientId=${clientId}&startDate=${startDate}&endDate=${endDate}`;
+    if (store_id && store_id !== 'all') {
+      url += `&store_id=${store_id}`;
+    }
+    return this.get(url, token);
   }
 }
 

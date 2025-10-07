@@ -46,16 +46,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const storedToken = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
+    const storedStores = localStorage.getItem('stores');
+
     if (storedToken && storedUser) {
-      setToken(storedToken);
       const parsedUser = JSON.parse(storedUser);
       setUser(parsedUser);
+      setToken(storedToken);
+
+      if (storedStores) {
+        setStores(JSON.parse(storedStores));
+      }
+
+      // Set selectedStore based on user's store_id or default to 'all'
       if (parsedUser.store_id) {
         setSelectedStore(parsedUser.store_id);
+      } else if (storedStores) {
+        const stores = JSON.parse(storedStores);
+        if (stores.length > 0) {
+          setSelectedStore('all'); // Or a default store ID
+        }
       }
+    } else {
+      // If no token, ensure user is logged out
+      setUser(null);
+      setToken(null);
+      setStores([]);
+      setSelectedStore(null);
     }
+
     setLoading(false);
-  }, []);
+  }, [router]);
 
   const login = async (clientId: string, usernameOrEmail: string, password: string): Promise<void> => {
     try {

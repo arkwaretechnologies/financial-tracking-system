@@ -3,43 +3,116 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, Store, DollarSign, TrendingUp } from 'lucide-react';
+import { Users, Store, DollarSign, TrendingUp, PhilippinePeso, Banknote, ShoppingCart, BanknoteArrowDown } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { api } from '@/lib/api';
 
 export default function DashboardPage() {
-  const { user, stores } = useAuth();
+  const { user, stores, selectedStore, token } = useAuth();
   const router = useRouter();
+  const [totalSales, setTotalSales] = useState(0);
+  const [previousMonthSales, setPreviousMonthSales] = useState(0);
+  const [salesPercentageChange, setSalesPercentageChange] = useState(0);
+  const [totalPurchases, setTotalPurchases] = useState(0);
+  const [previousMonthPurchases, setPreviousMonthPurchases] = useState(0);
+  const [purchasesPercentageChange, setPurchasesPercentageChange] = useState(0);
+  const [totalExpenses, setTotalExpenses] = useState(0);
+  const [previousMonthExpenses, setPreviousMonthExpenses] = useState(0);
+  const [expensesPercentageChange, setExpensesPercentageChange] = useState(0);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      if (user && token && selectedStore) {
+        try {
+          const today = new Date();
+          const previousMonth = new Date();
+          previousMonth.setMonth(previousMonth.getMonth() - 1);
+          const previousMonthStartDate = new Date(previousMonth.getFullYear(), previousMonth.getMonth(), 1).toISOString();
+          const previousMonthEndDate = new Date(previousMonth.getFullYear(), previousMonth.getMonth() + 1, 0).toISOString();
+
+          // Fetch Sales Data
+          const salesResponse = await api.getTotalSales(token, user.client_id, selectedStore);
+          setTotalSales(salesResponse.totalSales);
+
+          const previousMonthSalesResponse = await api.getTotalSalesByDate(token, user.client_id, previousMonthStartDate, previousMonthEndDate, selectedStore);
+          setPreviousMonthSales(previousMonthSalesResponse.totalSales);
+
+          if (previousMonthSalesResponse.totalSales > 0) {
+            const salesChange = ((salesResponse.totalSales - previousMonthSalesResponse.totalSales) / previousMonthSalesResponse.totalSales) * 100;
+            setSalesPercentageChange(salesChange);
+          } else {
+            setSalesPercentageChange(100);
+          }
+
+          // Fetch Purchases Data
+          const purchasesResponse = await api.getTotalPurchases(token, user.client_id, selectedStore);
+          setTotalPurchases(purchasesResponse.totalPurchases);
+
+          const previousMonthPurchasesResponse = await api.getTotalPurchasesByDate(token, user.client_id, previousMonthStartDate, previousMonthEndDate, selectedStore);
+          setPreviousMonthPurchases(previousMonthPurchasesResponse.totalPurchases);
+
+          if (previousMonthPurchasesResponse.totalPurchases > 0) {
+            const purchasesChange = ((purchasesResponse.totalPurchases - previousMonthPurchasesResponse.totalPurchases) / previousMonthPurchasesResponse.totalPurchases) * 100;
+            setPurchasesPercentageChange(purchasesChange);
+          } else {
+            setPurchasesPercentageChange(100);
+          }
+
+          // Fetch Expenses Data
+          const expensesResponse = await api.getTotalExpenses(token, user.client_id, selectedStore);
+          setTotalExpenses(expensesResponse.totalExpenses);
+
+          const previousMonthExpensesResponse = await api.getTotalExpensesByDate(token, user.client_id, previousMonthStartDate, previousMonthEndDate, selectedStore);
+          setPreviousMonthExpenses(previousMonthExpensesResponse.totalExpenses);
+
+          if (previousMonthExpensesResponse.totalExpenses > 0) {
+            const change = ((expensesResponse.totalExpenses - previousMonthExpensesResponse.totalExpenses) / previousMonthExpensesResponse.totalExpenses) * 100;
+            setExpensesPercentageChange(change);
+          } else {
+            setExpensesPercentageChange(100); // Or handle as infinite change
+          }
+        } catch (error) {
+          console.error("Failed to fetch data:", error);
+          setTotalSales(0);
+          setPreviousMonthSales(0);
+          setSalesPercentageChange(0);
+          setTotalPurchases(0);
+          setPreviousMonthPurchases(0);
+          setPurchasesPercentageChange(0);
+          setTotalExpenses(0);
+          setPreviousMonthExpenses(0);
+          setExpensesPercentageChange(0);
+        }
+      }
+    };
+
+    fetchDashboardData();
+  }, [user, token, selectedStore]);
 
   // Use client name from user data
 
   const stats = [
     {
       title: 'Total Sales',
-      value: 'Php 12,450',
-      change: '+12.5%',
-      icon: DollarSign,
+      value: `${totalSales.toLocaleString()}`,
+      change: `${salesPercentageChange.toFixed(1)}%`,
+      icon: PhilippinePeso,
       color: 'text-green-600',
     },
     {
       title: 'Total Purchases',
-      value: 'Php 8,230',
-      change: '+5.2%',
-      icon: TrendingUp,
+      value: `${totalPurchases.toLocaleString()}`,
+      change: `${purchasesPercentageChange.toFixed(1)}%`,
+      icon: ShoppingCart,
       color: 'text-blue-600',
     },
     {
       title: 'Total Expenses',
-      value: 'Php 2,150',
-      change: '-3.1%',
-      icon: DollarSign,
+      value: `${totalExpenses.toLocaleString()}`,
+      change: `${expensesPercentageChange.toFixed(1)}%`,
+      icon: BanknoteArrowDown,
       color: 'text-red-600',
-    },
-    {
-      title: 'Active Stores',
-      value: user?.role === 'admin' ? 'All' : stores.length.toString(),
-      change: '0%',
-      icon: Store,
-      color: 'text-purple-600',
     },
   ];
 
@@ -109,7 +182,7 @@ export default function DashboardPage() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         {stats.map((stat, index) => {
           const Icon = stat.icon;
           return (
@@ -129,39 +202,7 @@ export default function DashboardPage() {
         })}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Transactions</CardTitle>
-            <CardDescription>Your latest financial activities</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="font-medium">Sale - Store A</p>
-                  <p className="text-sm text-gray-600">2 hours ago</p>
-                </div>
-                <span className="text-green-600 font-medium">+Php 250</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="font-medium">Purchase - Inventory</p>
-                  <p className="text-sm text-gray-600">5 hours ago</p>
-                </div>
-                <span className="text-blue-600 font-medium">-Php 180</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="font-medium">Expense - Utilities</p>
-                  <p className="text-sm text-gray-600">1 day ago</p>
-                </div>
-                <span className="text-red-600 font-medium">-Php 45</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
+      <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
         <Card>
           <CardHeader>
             <CardTitle>Quick Actions</CardTitle>
