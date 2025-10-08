@@ -2,19 +2,16 @@
 
 import { useAuth } from '@/contexts/AuthContext';
 import { useStore } from '@/contexts/StoreContext';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { 
   BarChart3, 
   ShoppingBag, 
   Users, 
-  Package, 
   Settings, 
   Building,
   LogOut,
   Menu,
   X,
-  ChevronDown
 } from 'lucide-react';
 import {
   Select,
@@ -25,7 +22,7 @@ import {
 } from "@/components/ui/select";
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 interface NavItem {
   title: string;

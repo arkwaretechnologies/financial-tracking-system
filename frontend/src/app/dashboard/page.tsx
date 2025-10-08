@@ -3,7 +3,7 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, Store, DollarSign, TrendingUp, PhilippinePeso, Banknote, ShoppingCart, BanknoteArrowDown } from 'lucide-react';
+import { Store, PhilippinePeso, Banknote, ShoppingCart, BanknoteArrowDown } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
@@ -12,77 +12,29 @@ export default function DashboardPage() {
   const { user, stores, selectedStore, token } = useAuth();
   const router = useRouter();
   const [totalSales, setTotalSales] = useState(0);
-  const [previousMonthSales, setPreviousMonthSales] = useState(0);
-  const [salesPercentageChange, setSalesPercentageChange] = useState(0);
   const [totalPurchases, setTotalPurchases] = useState(0);
-  const [previousMonthPurchases, setPreviousMonthPurchases] = useState(0);
-  const [purchasesPercentageChange, setPurchasesPercentageChange] = useState(0);
   const [totalExpenses, setTotalExpenses] = useState(0);
-  const [previousMonthExpenses, setPreviousMonthExpenses] = useState(0);
-  const [expensesPercentageChange, setExpensesPercentageChange] = useState(0);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       if (user && token && selectedStore) {
         try {
-          const today = new Date();
-          const previousMonth = new Date();
-          previousMonth.setMonth(previousMonth.getMonth() - 1);
-          const previousMonthStartDate = new Date(previousMonth.getFullYear(), previousMonth.getMonth(), 1).toISOString();
-          const previousMonthEndDate = new Date(previousMonth.getFullYear(), previousMonth.getMonth() + 1, 0).toISOString();
-
           // Fetch Sales Data
           const salesResponse = await api.getTotalSales(token, user.client_id, selectedStore);
           setTotalSales(salesResponse.totalSales);
-
-          const previousMonthSalesResponse = await api.getTotalSalesByDate(token, user.client_id, previousMonthStartDate, previousMonthEndDate, selectedStore);
-          setPreviousMonthSales(previousMonthSalesResponse.totalSales);
-
-          if (previousMonthSalesResponse.totalSales > 0) {
-            const salesChange = ((salesResponse.totalSales - previousMonthSalesResponse.totalSales) / previousMonthSalesResponse.totalSales) * 100;
-            setSalesPercentageChange(salesChange);
-          } else {
-            setSalesPercentageChange(100);
-          }
 
           // Fetch Purchases Data
           const purchasesResponse = await api.getTotalPurchases(token, user.client_id, selectedStore);
           setTotalPurchases(purchasesResponse.totalPurchases);
 
-          const previousMonthPurchasesResponse = await api.getTotalPurchasesByDate(token, user.client_id, previousMonthStartDate, previousMonthEndDate, selectedStore);
-          setPreviousMonthPurchases(previousMonthPurchasesResponse.totalPurchases);
-
-          if (previousMonthPurchasesResponse.totalPurchases > 0) {
-            const purchasesChange = ((purchasesResponse.totalPurchases - previousMonthPurchasesResponse.totalPurchases) / previousMonthPurchasesResponse.totalPurchases) * 100;
-            setPurchasesPercentageChange(purchasesChange);
-          } else {
-            setPurchasesPercentageChange(100);
-          }
-
           // Fetch Expenses Data
           const expensesResponse = await api.getTotalExpenses(token, user.client_id, selectedStore);
           setTotalExpenses(expensesResponse.totalExpenses);
-
-          const previousMonthExpensesResponse = await api.getTotalExpensesByDate(token, user.client_id, previousMonthStartDate, previousMonthEndDate, selectedStore);
-          setPreviousMonthExpenses(previousMonthExpensesResponse.totalExpenses);
-
-          if (previousMonthExpensesResponse.totalExpenses > 0) {
-            const change = ((expensesResponse.totalExpenses - previousMonthExpensesResponse.totalExpenses) / previousMonthExpensesResponse.totalExpenses) * 100;
-            setExpensesPercentageChange(change);
-          } else {
-            setExpensesPercentageChange(100); // Or handle as infinite change
-          }
         } catch (error) {
           console.error("Failed to fetch data:", error);
           setTotalSales(0);
-          setPreviousMonthSales(0);
-          setSalesPercentageChange(0);
           setTotalPurchases(0);
-          setPreviousMonthPurchases(0);
-          setPurchasesPercentageChange(0);
           setTotalExpenses(0);
-          setPreviousMonthExpenses(0);
-          setExpensesPercentageChange(0);
         }
       }
     };
@@ -96,21 +48,21 @@ export default function DashboardPage() {
     {
       title: 'Total Sales',
       value: `${totalSales.toLocaleString()}`,
-      change: `${salesPercentageChange.toFixed(1)}%`,
+      change: '',
       icon: PhilippinePeso,
       color: 'text-green-600',
     },
     {
       title: 'Total Purchases',
       value: `${totalPurchases.toLocaleString()}`,
-      change: `${purchasesPercentageChange.toFixed(1)}%`,
+      change: '',
       icon: ShoppingCart,
       color: 'text-blue-600',
     },
     {
       title: 'Total Expenses',
       value: `${totalExpenses.toLocaleString()}`,
-      change: `${expensesPercentageChange.toFixed(1)}%`,
+      change: '',
       icon: BanknoteArrowDown,
       color: 'text-red-600',
     },
@@ -193,9 +145,11 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{stat.value}</div>
-                <p className={`text-xs ${stat.change.startsWith('+') ? 'text-green-600' : stat.change.startsWith('-') ? 'text-red-600' : 'text-gray-600'}`}>
-                  {stat.change} from last month
-                </p>
+                {stat.change && (
+                  <p className={`text-xs ${stat.change.startsWith('+') ? 'text-green-600' : stat.change.startsWith('-') ? 'text-red-600' : 'text-gray-600'}`}>
+                    {stat.change} from last month
+                  </p>
+                )}
               </CardContent>
             </Card>
           );

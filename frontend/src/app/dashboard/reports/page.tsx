@@ -41,14 +41,19 @@ export default function ReportsPage() {
   const handleGenerateReport = async () => {
     if (token && user?.client_id && fromDate && toDate) {
       try {
-        const response = await api.getGrossIncome(
-          token,
-          user.client_id,
-          fromDate,
-          toDate,
-          selectedStore
-        );
-        setReportData(response);
+        const [grossIncomeRes, totalSalesRes, totalPurchasesRes, totalExpensesRes] = await Promise.all([
+          api.getGrossIncome(token, user.client_id, fromDate, toDate, selectedStore),
+          api.getTotalSalesByDate(token, user.client_id, fromDate, toDate, selectedStore),
+          api.getTotalPurchasesByDate(token, user.client_id, fromDate, toDate, selectedStore),
+          api.getTotalExpensesByDate(token, user.client_id, fromDate, toDate, selectedStore)
+        ]);
+
+        setReportData({
+          grossIncome: grossIncomeRes.grossIncome,
+          totalSales: totalSalesRes.totalSales,
+          totalPurchases: totalPurchasesRes.totalPurchases,
+          totalExpenses: totalExpensesRes.totalExpenses,
+        });
       } catch (error) {
         console.error('Failed to generate report:', error);
       }

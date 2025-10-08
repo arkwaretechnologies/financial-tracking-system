@@ -41,10 +41,6 @@ interface ValidateClientResponse {
   };
 }
 
-interface ApiError {
-  error: string;
-}
-
 interface User {
   id: string;
   username: string;
@@ -99,7 +95,19 @@ export interface CreatePurchaseRequest {
 }
 
 export interface CreatePurchase {
-  [key: string]: any;
+  ref_num: string;
+  client_id: string;
+  store_id?: string;
+  user_id?: string;
+  description?: string;
+  supplier?: string;
+  payment_method?: 'cash' | 'card' | 'check' | string;
+  amount: number;
+  purchase_date: string; // YYYY-MM-DD
+  image_base64?: string;
+  image_filename?: string;
+  category?: string;
+  other_category?: string;
 }
 
 export interface CreateExpenseRequest {
@@ -109,7 +117,7 @@ export interface CreateExpenseRequest {
   user_id: string;
   description: string;
   paid_to: string;
-  payment_method: string;
+  payment_method: 'cash' | 'card' | 'check';
   amount: number;
   expense_date: string;
   image_base64?: string;
@@ -117,13 +125,17 @@ export interface CreateExpenseRequest {
 }
 
 export interface Expense {
+  id: string;
   ref_num: string;
+  client_id: string;
+  store_id: string;
+  user_id: string;
   expense_date: string;
   amount: number;
   description: string;
   paid_to: string;
   store_name: string;
-  payment_method: string;
+  payment_method: 'cash' | 'card' | 'check';
   supp_doc_url?: string;
 }
 
@@ -148,6 +160,14 @@ export interface Sale {
   payment_method: string;
   supp_doc_url?: string;
 }
+
+interface Store {
+  id: string;
+  name: string;
+  client_id: string;
+  created_at: string;
+}
+
 
 class ApiClient {
   private baseUrl: string;
@@ -194,7 +214,7 @@ class ApiClient {
     return this.request<T>(endpoint, { headers });
   }
 
-  private async post<T>(endpoint: string, data: any, token?: string): Promise<T> {
+  private async post<T, TBody>(endpoint: string, data: TBody, token?: string): Promise<T> {
     const headers: HeadersInit = {};
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
@@ -206,7 +226,7 @@ class ApiClient {
     });
   }
 
-  private async put<T>(endpoint: string, data: any, token?: string): Promise<T> {
+  private async put<T, TBody>(endpoint: string, data: TBody, token?: string): Promise<T> {
     const headers: HeadersInit = {};
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
@@ -246,7 +266,7 @@ class ApiClient {
     return this.get(`/users/client/${clientId}`, token);
   }
 
-  async getStoresByClient(token: string, clientId: string): Promise<{ stores: any[] }> {
+  async getStoresByClient(token: string, clientId: string): Promise<{ stores: Store[] }> {
     return this.get(`/stores/client/${clientId}`, token);
   }
 
@@ -255,11 +275,11 @@ class ApiClient {
   }
 
   // Add sales API support
-  async createSale(token: string, saleData: CreateSaleRequest): Promise<{ sale: any; image_path?: string; message: string }> {
+  async createSale(token: string, saleData: CreateSaleRequest): Promise<{ sale: Sale; image_path?: string; message: string }> {
     return this.post('/sales', saleData, token);
   }
 
-  async updateSale(token: string, refNum: string, saleData: Partial<CreateSaleRequest>): Promise<{ sale: any; message: string }> {
+  async updateSale(token: string, refNum: string, saleData: Partial<CreateSaleRequest>): Promise<{ sale: Sale; message: string }> {
     return this.put(`/sales/${refNum}`, saleData, token);
   }
 
@@ -289,15 +309,15 @@ class ApiClient {
     return this.get(`/purchases/client/${clientId}?${query.toString()}`, token);
   }
 
-  async createPurchase(token: string, purchaseData: CreatePurchaseRequest): Promise<{ purchase: any; image_path?: string; message: string }> {
+  async createPurchase(token: string, purchaseData: CreatePurchaseRequest): Promise<{ purchase: Purchase; image_path?: string; message: string }> {
     return this.post('/purchases', purchaseData, token);
   }
 
-  async updatePurchase(token: string, refNum: string, data: Partial<CreatePurchaseRequest>): Promise<any> {
+  async updatePurchase(token: string, refNum: string, data: Partial<CreatePurchaseRequest>): Promise<{purchase: Purchase, message: string}> {
     return this.put(`/purchases/${refNum}`, data, token);
   }
 
-  async deletePurchase(token: string, refNum: string): Promise<any> {
+  async deletePurchase(token: string, refNum: string): Promise<{message: string}> {
     return this.delete(`/purchases/${refNum}`, token);
   }
 
@@ -311,18 +331,18 @@ class ApiClient {
   }
 
   async createExpense(token: string, data: CreateExpenseRequest): Promise<Expense> {
-    return this.post<Expense>('/expenses', data, token);
+    return this.post<Expense, CreateExpenseRequest>('/expenses', data, token);
   }
 
-  async updateExpense(token: string, refNum: string, expenseData: Partial<CreateExpenseRequest>): Promise<any> {
+  async updateExpense(token: string, refNum: string, expenseData: Partial<CreateExpenseRequest>): Promise<{expense: Expense, message: string}> {
     return this.put(`/expenses/${refNum}`, expenseData, token);
   }
 
-  async deleteExpense(token: string, refNum: string): Promise<any> {
+  async deleteExpense(token: string, refNum: string): Promise<{message: string}> {
     return this.delete(`/expenses/${refNum}`, token);
   }
 
-  async getGrossIncome(token: string, clientId: string, startDate: string, endDate: string, store_id?: string): Promise<any> {
+  async getGrossIncome(token: string, clientId: string, startDate: string, endDate: string, store_id?: string): Promise<{grossIncome: number}> {
     let url = `/reports/gross-income?clientId=${clientId}&startDate=${startDate}&endDate=${endDate}`;
     if (store_id && store_id !== 'all') {
       url += `&store_id=${store_id}`;
@@ -379,5 +399,4 @@ class ApiClient {
   }
 }
 
-const apiClient = new ApiClient(API_BASE_URL);
 export const api = new ApiClient(API_BASE_URL);

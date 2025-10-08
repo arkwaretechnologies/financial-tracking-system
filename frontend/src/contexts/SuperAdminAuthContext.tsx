@@ -2,7 +2,6 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { api } from '@/lib/api';
 
 interface SuperAdmin {
   id: string;
@@ -66,7 +65,7 @@ export function SuperAdminAuthProvider({ children }: { children: React.ReactNode
       } else {
         throw new Error('Invalid super admin credentials');
       }
-    } catch (error) {
+    } catch {
       throw new Error('Invalid credentials');
     }
   };

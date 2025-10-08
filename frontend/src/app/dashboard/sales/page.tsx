@@ -12,7 +12,7 @@ import { FileUpload } from '@/components/ui/file-upload';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
 import { useEffect } from 'react';
-import { toast } from "sonner";
+import Image from "next/image";
 
 interface Sale {
   ref_num: string;
@@ -26,7 +26,7 @@ interface Sale {
 
 export default function SalesPage() {
   const [sales, setSales] = useState<Sale[]>([]);
-  const { user, token, selectedStore } = useAuth();
+  const { user, token } = useAuth();
   const [newSale, setNewSale] = useState({
     ref_num: '',
     date: new Date().toISOString().split('T')[0],
@@ -41,13 +41,13 @@ export default function SalesPage() {
   const [searchDescription, setSearchDescription] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize] = useState(10);
 
   useEffect(() => {
     const fetchSales = async () => {
       if (token && user?.client_id) {
         try {
-          const response = await api.getSalesByClient(token, user.client_id, selectedStore || 'all', searchRefNum, searchDescription, currentPage, pageSize);
+          const response = await api.getSalesByClient(token, user.client_id, 'all', searchRefNum, searchDescription, currentPage, pageSize);
           setSales(response.sales);
           setTotalPages(Math.ceil(response.count / pageSize));
         } catch (error) {
@@ -58,14 +58,7 @@ export default function SalesPage() {
     };
 
     fetchSales();
-  }, [token, user?.client_id, selectedStore, searchRefNum, searchDescription, currentPage, pageSize]);
-
-  // Mock stores data
-  const stores = [
-    { id: '1', name: 'Main Store' },
-    { id: '2', name: 'Downtown Branch' },
-    { id: '3', name: 'Westside Store' },
-  ];
+  }, [token, user?.client_id, searchRefNum, searchDescription, currentPage, pageSize]);
 
   const handleCreateSale = async () => {
     if (!newSale.ref_num.trim() || !newSale.amount || !newSale.description.trim()) return;
@@ -246,7 +239,6 @@ export default function SalesPage() {
                 <div className="col-span-3">
                   <FileUpload 
                     onFileChange={setSaleDocument}
-                    value={saleDocument}
                   />
                 </div>
               </div>
@@ -407,7 +399,7 @@ export default function SalesPage() {
                   <TableCell>
                     {sale.supp_doc_url && (
                       <a href={sale.supp_doc_url} target="_blank" rel="noopener noreferrer">
-                        <img src={sale.supp_doc_url} alt="Sale Document" className="h-10 w-10 object-cover" />
+                        <Image src={sale.supp_doc_url} alt="Sale Document" width={40} height={40} className="object-cover" />
                       </a>
                     )}
                   </TableCell>

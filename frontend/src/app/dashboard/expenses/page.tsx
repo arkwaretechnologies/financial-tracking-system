@@ -15,7 +15,7 @@ import { api, CreateExpenseRequest, Expense } from '@/lib/api';
 
 export default function ExpensesPage() {
   const { currentStore } = useStore();
-  const { user, token, selectedStore } = useAuth();
+  const { user, token } = useAuth();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [filteredExpenses, setFilteredExpenses] = useState<Expense[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -36,10 +36,10 @@ export default function ExpensesPage() {
 
   useEffect(() => {
     const fetchExpenses = async () => {
-      if (user && token && selectedStore) {
+      if (user && token && currentStore && currentStore.id) {
         setIsLoading(true);
         try {
-          const response = await api.getExpenses(token, user.client_id, selectedStore, '', '');
+          const response = await api.getExpenses(token, user.client_id, currentStore.id, '', '');
           console.log('Raw API response:', response);
           if (Array.isArray(response)) {
             setExpenses(response);
@@ -58,7 +58,7 @@ export default function ExpensesPage() {
       }
     };
 
-    if (selectedStore) { // Only fetch if a store is selected
+    if (currentStore && currentStore.id) { // Only fetch if a store is selected
       fetchExpenses();
     } else {
       // If no store is selected, don't show loading, just an empty state.
@@ -66,7 +66,7 @@ export default function ExpensesPage() {
       setExpenses([]);
       setFilteredExpenses([]);
     }
-  }, [user, token, selectedStore]);
+  }, [user, token, currentStore]);
 
   useEffect(() => {
     let filtered = expenses;
@@ -143,7 +143,7 @@ export default function ExpensesPage() {
 
     try {
       const updatedExpense = await api.updateExpense(token, editingExpense.ref_num, editingExpense);
-      setExpenses(expenses.map(exp => exp.ref_num === editingExpense.ref_num ? updatedExpense : exp));
+      setExpenses(expenses.map(exp => exp.ref_num === editingExpense.ref_num ? updatedExpense.expense : exp));
       setIsEditing(false);
       setEditingExpense(null);
     } catch (error) {
@@ -275,7 +275,6 @@ export default function ExpensesPage() {
                 <div className="col-span-3">
                   <FileUpload 
                     onFileChange={setExpenseDocument}
-                    value={expenseDocument}
                   />
                 </div>
               </div>
@@ -388,7 +387,7 @@ export default function ExpensesPage() {
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="edit-payment">Payment Method</Label>
-                <Select value={editingExpense?.payment_method} onValueChange={(value) => setEditingExpense(editingExpense ? { ...editingExpense, payment_method: value } : null)}>
+                <Select value={editingExpense?.payment_method} onValueChange={(value) => setEditingExpense(editingExpense ? { ...editingExpense, payment_method: value as 'cash' | 'card' | 'check' } : null)}>
                   <SelectTrigger className="col-span-3">
                     <SelectValue placeholder="Select payment method" />
                   </SelectTrigger>

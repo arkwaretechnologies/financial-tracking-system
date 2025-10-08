@@ -15,12 +15,11 @@ export interface Expense {
   store_name?: string;
 }
 
-export const getExpensesByClient = async (token: string, clientId: string): Promise<Expense[]> => {
-  const { expenses } = await api.getExpensesByClient(token, clientId);
+export const getExpensesByClient = async (token: string, clientId: string, storeId: string): Promise<Expense[]> => {
+  const expenses = await api.getExpenses(token, clientId, storeId);
   return expenses;
 };
 
 export const createExpense = async (token: string, data: CreateExpenseRequest): Promise<Expense> => {
-  const { expense } = await api.createExpense(token, data);
-  return expense;
+  return api.createExpense(token, data);
 };

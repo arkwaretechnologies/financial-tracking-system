@@ -43,11 +43,15 @@ export default function LoginPage() {
       } else {
         setError('Client not found');
       }
-    } catch (err: any) {
-      if (err.status === 404 || err.message?.includes('not found')) {
-        setError('Client not found');
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        if (err.message?.includes('not found')) {
+          setError('Client not found');
+        } else {
+          setError(err.message || 'Failed to validate client');
+        }
       } else {
-        setError(err.message || 'Failed to validate client');
+        setError('An unexpected error occurred');
       }
     } finally {
       setLoading(false);

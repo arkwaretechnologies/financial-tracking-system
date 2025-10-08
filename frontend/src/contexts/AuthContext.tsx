@@ -4,6 +4,20 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 
+interface Store {
+  id: string;
+  name: string;
+  client_id: string;
+  created_at: string;
+}
+
+interface LoginRequest {
+  client_id: string;
+  email?: string;
+  username?: string;
+  password: string;
+}
+
 interface User {
   id: string;
   username: string;
@@ -25,7 +39,7 @@ interface User {
 interface AuthContextType {
   user: User | null;
   token: string | null;
-  stores: any[];
+  stores: Store[];
   selectedStore: string | null;
   setSelectedStore: (storeId: string | null) => void;
   login: (clientId: string, usernameOrEmail: string, password: string) => Promise<void>;
@@ -38,7 +52,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
-  const [stores, setStores] = useState<any[]>([]);
+  const [stores, setStores] = useState<Store[]>([]);
   const [selectedStore, _setSelectedStore] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
@@ -92,19 +106,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setLoading(true);
       
-      // Prepare login request data with proper typing
-      const loginData: any = {
-        client_id: clientId,
-        password: password
-      };
-      
       // Determine if usernameOrEmail is an email or username
       const isEmail = usernameOrEmail.includes('@');
-      if (isEmail) {
-        loginData.email = usernameOrEmail;
-      } else {
-        loginData.username = usernameOrEmail;
-      }
+
+      const loginData: LoginRequest = {
+        client_id: clientId,
+        password: password,
+        ...(isEmail ? { email: usernameOrEmail } : { username: usernameOrEmail })
+      };
       
       // Call backend API
       const response = await api.login(loginData);
@@ -163,7 +172,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Redirect to dashboard
       router.push('/dashboard');
     } catch (error) {
-      throw new Error(error instanceof Error ? error.message : 'Authentication failed');
+      throw new Error(error instanceof Error ? error.message : String(error));
     } finally {
       setLoading(false);
     }

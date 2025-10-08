@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,10 +10,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Trash2, Edit, Plus, Users as UsersIcon } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { api } from '@/lib/api';
 
 interface ClientUser {
   id: string;
@@ -34,9 +32,8 @@ interface Role {
 }
 
 export default function ClientUsersPage() {
-  const { user, token } = useAuth();
+  const { user } = useAuth();
   const [users, setUsers] = useState<ClientUser[]>([]);
-  const [loading, setLoading] = useState(true);
   const [newUser, setNewUser] = useState({
     email: '',
     name: '',
@@ -59,283 +56,6 @@ export default function ClientUsersPage() {
   const [isEditRoleDialogOpen, setIsEditRoleDialogOpen] = useState(false);
   const [roleToEdit, setRoleToEdit] = useState<Role | null>(null);
 
-  // Define the current pages for role assignment
-  const availablePages = [
-    { value: 'dashboard', label: 'Dashboard' },
-    { value: 'sales', label: 'Sales' },
-    { value: 'purchases', label: 'Purchases' },
-    { value: 'inventory', label: 'Inventory' },
-    { value: 'transactions', label: 'Transactions' },
-    { value: 'reports', label: 'Reports' },
-    { value: 'users', label: 'Users' },
-    { value: 'stores', label: 'Stores' },
-    { value: 'clients', label: 'Clients' },
-    { value: 'settings', label: 'Settings' },
-    { value: 'user-management', label: 'User Management' },
-  ];
-
-  // Group pages by module for better UX
-  const pageGroups = [
-    { label: 'Operations', items: ['sales', 'purchases'] },
-    { label: 'Management', items: ['user-management', 'stores'] },
-    { label: 'Reporting', items: ['reports'] },
-    { label: 'Settings', items: ['settings'] },
-  ];
-
-  // Helper to show labels from values
-  const pageLabel = (value: string) => availablePages.find(p => p.value === value)?.label ?? value;
-
-  // Role Access Matrix - Comprehensive page access permissions for each role
-  const roleAccessMatrix = {
-    'Super Admin': {
-      roleId: 'super-admin',
-      roleType: 'system',
-      pages: {
-        'dashboard': { accessLevel: 'admin', canCreate: true, canRead: true, canUpdate: true, canDelete: true, canExport: true, canImport: true },
-        'sales': { accessLevel: 'admin', canCreate: true, canRead: true, canUpdate: true, canDelete: true, canExport: true, canImport: true },
-        'purchases': { accessLevel: 'admin', canCreate: true, canRead: true, canUpdate: true, canDelete: true, canExport: true, canImport: true },
-        'inventory': { accessLevel: 'admin', canCreate: true, canRead: true, canUpdate: true, canDelete: true, canExport: true, canImport: true },
-        'reports': { accessLevel: 'admin', canCreate: true, canRead: true, canUpdate: true, canDelete: true, canExport: true, canImport: true },
-        'users': { accessLevel: 'admin', canCreate: true, canRead: true, canUpdate: true, canDelete: true, canExport: true, canImport: true },
-        'settings': { accessLevel: 'admin', canCreate: true, canRead: true, canUpdate: true, canDelete: true, canExport: true, canImport: true },
-        'stores': { accessLevel: 'admin', canCreate: true, canRead: true, canUpdate: true, canDelete: true, canExport: true, canImport: true },
-        'clients': { accessLevel: 'admin', canCreate: true, canRead: true, canUpdate: true, canDelete: true, canExport: true, canImport: true },
-        'transactions': { accessLevel: 'admin', canCreate: true, canRead: true, canUpdate: true, canDelete: true, canExport: true, canImport: true },
-      }
-    },
-    'Client Admin': {
-      roleId: 'client-admin',
-      roleType: 'client',
-      pages: {
-        'dashboard': { accessLevel: 'admin', canCreate: true, canRead: true, canUpdate: true, canDelete: true, canExport: true, canImport: true },
-        'sales': { accessLevel: 'admin', canCreate: true, canRead: true, canUpdate: true, canDelete: true, canExport: true, canImport: true },
-        'purchases': { accessLevel: 'admin', canCreate: true, canRead: true, canUpdate: true, canDelete: true, canExport: true, canImport: true },
-        'inventory': { accessLevel: 'admin', canCreate: true, canRead: true, canUpdate: true, canDelete: true, canExport: true, canImport: true },
-        'reports': { accessLevel: 'admin', canCreate: true, canRead: true, canUpdate: true, canDelete: true, canExport: true, canImport: true },
-        'users': { accessLevel: 'admin', canCreate: true, canRead: true, canUpdate: true, canDelete: true, canExport: true, canImport: true },
-        'settings': { accessLevel: 'admin', canCreate: true, canRead: true, canUpdate: true, canDelete: true, canExport: true, canImport: true },
-        'stores': { accessLevel: 'admin', canCreate: true, canRead: true, canUpdate: true, canDelete: true, canExport: true, canImport: true },
-        'clients': { accessLevel: 'read', canCreate: false, canRead: true, canUpdate: false, canDelete: false, canExport: true, canImport: false },
-        'transactions': { accessLevel: 'admin', canCreate: true, canRead: true, canUpdate: true, canDelete: true, canExport: true, canImport: true },
-      }
-    },
-    'Store Manager': {
-      roleId: 'store-manager',
-      roleType: 'client',
-      pages: {
-        'dashboard': { accessLevel: 'read', canCreate: false, canRead: true, canUpdate: false, canDelete: false, canExport: true, canImport: false },
-        'sales': { accessLevel: 'write', canCreate: true, canRead: true, canUpdate: true, canDelete: false, canExport: true, canImport: true },
-        'purchases': { accessLevel: 'write', canCreate: true, canRead: true, canUpdate: true, canDelete: false, canExport: true, canImport: true },
-        'inventory': { accessLevel: 'write', canCreate: true, canRead: true, canUpdate: true, canDelete: false, canExport: true, canImport: true },
-        'reports': { accessLevel: 'read', canCreate: false, canRead: true, canUpdate: false, canDelete: false, canExport: true, canImport: false },
-        'users': { accessLevel: 'read', canCreate: false, canRead: true, canUpdate: false, canDelete: false, canExport: false, canImport: false },
-        'settings': { accessLevel: 'read', canCreate: false, canRead: true, canUpdate: false, canDelete: false, canExport: false, canImport: false },
-        'stores': { accessLevel: 'read', canCreate: false, canRead: true, canUpdate: false, canDelete: false, canExport: false, canImport: false },
-        'clients': { accessLevel: 'none', canCreate: false, canRead: false, canUpdate: false, canDelete: false, canExport: false, canImport: false },
-        'transactions': { accessLevel: 'write', canCreate: true, canRead: true, canUpdate: true, canDelete: false, canExport: true, canImport: true },
-      }
-    },
-    'Accountant': {
-      roleId: 'accountant',
-      roleType: 'client',
-      pages: {
-        'dashboard': { accessLevel: 'read', canCreate: false, canRead: true, canUpdate: false, canDelete: false, canExport: true, canImport: false },
-        'sales': { accessLevel: 'read', canCreate: false, canRead: true, canUpdate: false, canDelete: false, canExport: true, canImport: false },
-        'purchases': { accessLevel: 'read', canCreate: false, canRead: true, canUpdate: false, canDelete: false, canExport: true, canImport: false },
-        'inventory': { accessLevel: 'read', canCreate: false, canRead: true, canUpdate: false, canDelete: false, canExport: true, canImport: false },
-        'reports': { accessLevel: 'admin', canCreate: true, canRead: true, canUpdate: true, canDelete: true, canExport: true, canImport: true },
-        'users': { accessLevel: 'none', canCreate: false, canRead: false, canUpdate: false, canDelete: false, canExport: false, canImport: false },
-        'settings': { accessLevel: 'none', canCreate: false, canRead: false, canUpdate: false, canDelete: false, canExport: false, canImport: false },
-        'stores': { accessLevel: 'read', canCreate: false, canRead: true, canUpdate: false, canDelete: false, canExport: true, canImport: false },
-        'clients': { accessLevel: 'none', canCreate: false, canRead: false, canUpdate: false, canDelete: false, canExport: false, canImport: false },
-        'transactions': { accessLevel: 'read', canCreate: false, canRead: true, canUpdate: false, canDelete: false, canExport: true, canImport: false },
-      }
-    },
-    'Cashier': {
-      roleId: 'cashier',
-      roleType: 'client',
-      pages: {
-        'dashboard': { accessLevel: 'read', canCreate: false, canRead: true, canUpdate: false, canDelete: false, canExport: false, canImport: false },
-        'sales': { accessLevel: 'write', canCreate: true, canRead: true, canUpdate: true, canDelete: false, canExport: false, canImport: false },
-        'purchases': { accessLevel: 'none', canCreate: false, canRead: false, canUpdate: false, canDelete: false, canExport: false, canImport: false },
-        'inventory': { accessLevel: 'read', canCreate: false, canRead: true, canUpdate: false, canDelete: false, canExport: false, canImport: false },
-        'reports': { accessLevel: 'read', canCreate: false, canRead: true, canUpdate: false, canDelete: false, canExport: false, canImport: false },
-        'users': { accessLevel: 'none', canCreate: false, canRead: false, canUpdate: false, canDelete: false, canExport: false, canImport: false },
-        'settings': { accessLevel: 'none', canCreate: false, canRead: false, canUpdate: false, canDelete: false, canExport: false, canImport: false },
-        'stores': { accessLevel: 'none', canCreate: false, canRead: false, canUpdate: false, canDelete: false, canExport: false, canImport: false },
-        'clients': { accessLevel: 'none', canCreate: false, canRead: false, canUpdate: false, canDelete: false, canExport: false, canImport: false },
-        'transactions': { accessLevel: 'write', canCreate: true, canRead: true, canUpdate: false, canDelete: false, canExport: false, canImport: false },
-      }
-    },
-    'Viewer': {
-      roleId: 'viewer',
-      roleType: 'client',
-      pages: {
-        'dashboard': { accessLevel: 'read', canCreate: false, canRead: true, canUpdate: false, canDelete: false, canExport: false, canImport: false },
-        'sales': { accessLevel: 'read', canCreate: false, canRead: true, canUpdate: false, canDelete: false, canExport: false, canImport: false },
-        'purchases': { accessLevel: 'read', canCreate: false, canRead: true, canUpdate: false, canDelete: false, canExport: false, canImport: false },
-        'inventory': { accessLevel: 'read', canCreate: false, canRead: true, canUpdate: false, canDelete: false, canExport: false, canImport: false },
-        'reports': { accessLevel: 'read', canCreate: false, canRead: true, canUpdate: false, canDelete: false, canExport: false, canImport: false },
-        'users': { accessLevel: 'none', canCreate: false, canRead: false, canUpdate: false, canDelete: false, canExport: false, canImport: false },
-        'settings': { accessLevel: 'none', canCreate: false, canRead: false, canUpdate: false, canDelete: false, canExport: false, canImport: false },
-        'stores': { accessLevel: 'none', canCreate: false, canRead: false, canUpdate: false, canDelete: false, canExport: false, canImport: false },
-        'clients': { accessLevel: 'none', canCreate: false, canRead: false, canUpdate: false, canDelete: false, canExport: false, canImport: false },
-        'transactions': { accessLevel: 'read', canCreate: false, canRead: true, canUpdate: false, canDelete: false, canExport: false, canImport: false },
-      }
-    }
-  };
-
-  // All available pages in the system
-  const allPages = [
-    { key: 'dashboard', name: 'Dashboard', group: 'Core' },
-    { key: 'sales', name: 'Sales', group: 'Operations' },
-    { key: 'purchases', name: 'Purchases', group: 'Operations' },
-    { key: 'inventory', name: 'Inventory', group: 'Operations' },
-    { key: 'transactions', name: 'Transactions', group: 'Operations' },
-    { key: 'reports', name: 'Reports', group: 'Analytics' },
-    { key: 'users', name: 'Users', group: 'Management' },
-    { key: 'stores', name: 'Stores', group: 'Management' },
-    { key: 'clients', name: 'Clients', group: 'Management' },
-    { key: 'settings', name: 'Settings', group: 'Configuration' },
-  ];
-
-  // Define types for role access
-  interface PageAccess {
-    accessLevel: 'admin' | 'write' | 'read' | 'none';
-    canCreate: boolean;
-    canRead: boolean;
-    canUpdate: boolean;
-    canDelete: boolean;
-    canExport: boolean;
-    canImport: boolean;
-  }
-
-
-
-  // Helper function to determine badge variant and label based on access level
-  const getAccessBadge = (accessLevel: string) => {
-    switch (accessLevel) {
-      case 'admin':
-        return { variant: 'default' as const, label: 'Admin' };
-      case 'write':
-        return { variant: 'secondary' as const, label: 'Write' };
-      case 'read':
-        return { variant: 'outline' as const, label: 'Read' };
-      case 'none':
-      default:
-        return { variant: 'destructive' as const, label: 'No Access' };
-    }
-  };
-
-  // Mock stores for the current client
-  const clientStores = [
-    { id: '1', name: 'Main Store' },
-    { id: '2', name: 'Downtown Branch' },
-    { id: '3', name: 'Warehouse' },
-  ];
-
-  // Fetch real users data from the backend API
-  useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        console.log('Fetching users - Token available:', !!token);
-        console.log('Fetching users - Token value:', token ? token.substring(0, 10) + '...' : 'null');
-        console.log('Fetching users - User available:', !!user);
-        console.log('Fetching users - Client ID:', user?.client_id);
-        
-        if (!token) {
-          console.error('No authentication token found');
-          setLoading(false);
-          return;
-        }
-
-        if (!user?.client_id) {
-          console.error('No client ID found for logged-in user');
-          setLoading(false);
-          return;
-        }
-
-        const response = await api.getUsersByClient(token, user.client_id);
-        
-        // Transform backend user data to match our ClientUser interface
-        const transformedUsers: ClientUser[] = response.users.map((user: any) => ({
-          id: user.id,
-          email: user.email,
-          name: user.username, // Using username as name since backend doesn't have separate name field
-          role: user.role === 'super_admin' ? 'admin' : 'client_user',
-          store_id: user.store_id || '1', // Default store if not provided
-          store_name: user.store_name || 'Main Store', // Default store name
-          created_at: user.created_at?.split('T')[0] || new Date().toISOString().split('T')[0],
-          status: user.is_active !== false ? 'active' : 'inactive' // Default to active if not specified
-        }));
-
-        setUsers(transformedUsers);
-        setLoading(false);
-      } catch (error) {
-        console.error('Error fetching users:', error);
-        console.error('Error details:', {
-          message: error instanceof Error ? error.message : 'Unknown error',
-          tokenAvailable: !!token,
-          clientIdAvailable: !!user?.client_id,
-          tokenLength: token?.length
-        });
-        setLoading(false);
-      }
-    };
-
-    fetchUsers();
-  }, [user?.client_id, token]);
-
-  const handleAddUser = async () => {
-    try {
-      if (!token) {
-        console.error('No authentication token found');
-        return;
-      }
-
-      const userData = {
-        username: newUser.name,
-        email: newUser.email,
-        password: newUser.password,
-        role: newUser.role,
-        client_id: user?.client_id || '',
-        store_id: newUser.store_id || undefined
-      };
-
-      const response = await api.createUser(token, userData);
-      
-      // Create new user object for local state
-      const newUserObj: ClientUser = {
-        id: response.user.id,
-        email: response.user.email,
-        name: response.user.username,
-        role: response.user.role === 'super_admin' ? 'admin' : 'client_user',
-        store_id: response.user.store_id || '1',
-        store_name: clientStores.find(s => s.id === (response.user.store_id || '1'))?.name || 'Main Store',
-        created_at: response.user.created_at?.split('T')[0] || new Date().toISOString().split('T')[0],
-        status: 'active'
-      };
-
-      setUsers([...users, newUserObj]);
-      setNewUser({ email: '', name: '', role: 'client_user', store_id: '', password: '' });
-      setIsAddDialogOpen(false);
-    } catch (error) {
-      console.error('Error creating user:', error);
-      alert('Failed to create user. Please try again.');
-    }
-  };
-
-  const handleAddRole = () => {
-    setRoles([
-      ...roles,
-      { ...newRole, id: String(roles.length + 1), permissions: selectedPermissions },
-    ]);
-    setNewRole({ name: '', description: '', permissions: [] });
-    setSelectedPermissions([]);
-    setIsAddRoleDialogOpen(false);
-  };
-
-  // Update existing role
   const handleUpdateRole = () => {
     if (!roleToEdit) return;
     setRoles(roles.map(r => r.id === roleToEdit.id ? { ...roleToEdit, permissions: selectedPermissions } : r));
@@ -344,10 +64,6 @@ export default function ClientUsersPage() {
     setIsEditRoleDialogOpen(false);
   };
 
-  // Delete role
-  const handleDeleteRole = (roleId: string) => {
-    setRoles(roles.filter(r => r.id !== roleId));
-  };
   const handleEditUser = () => {
     if (!editingUser) return;
 
@@ -355,7 +71,6 @@ export default function ClientUsersPage() {
       u.id === editingUser.id
         ? {
             ...editingUser,
-            store_name: clientStores.find(s => s.id === editingUser.store_id)?.name || ''
           }
         : u
     ));
@@ -375,15 +90,6 @@ export default function ClientUsersPage() {
     ));
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
-      </div>
-    );
-  }
-
-  // Only allow admin users to access this page
   if (user?.role !== 'admin') {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -391,7 +97,7 @@ export default function ClientUsersPage() {
           <CardHeader>
             <CardTitle className="text-center">Access Denied</CardTitle>
             <CardDescription className="text-center">
-              You don't have permission to access user management.
+              You don&apos;t have permission to access user management.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -471,11 +177,6 @@ export default function ClientUsersPage() {
                     <SelectValue placeholder="Select a store" />
                   </SelectTrigger>
                   <SelectContent>
-                    {clientStores.map((store) => (
-                      <SelectItem key={store.id} value={store.id}>
-                        {store.name}
-                      </SelectItem>
-                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -484,7 +185,7 @@ export default function ClientUsersPage() {
               <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleAddUser}>Add User</Button>
+              <Button>Add User</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -646,26 +347,19 @@ export default function ClientUsersPage() {
                       
                       const roleName = roleMapping[user.role as keyof typeof roleMapping] || 'Viewer';
                       
-                      // Debug logging to help identify the issue
-                      console.log('User role:', user.role);
-                      console.log('Mapped roleName:', roleName);
-                      console.log('Available roles in matrix:', Object.keys(roleAccessMatrix));
-                      
                       // Get the pages this user has access to based on their role
-                      const userRoleData = roleAccessMatrix[roleName as keyof typeof roleAccessMatrix];
+                      const userRoleData = roles.find(r => r.name === roleName);
                       
                       // Handle case where role data is not found
                       if (!userRoleData) {
                         console.error(`Role data not found for role: ${roleName}`);
                       }
                       
-                      const accessiblePages = userRoleData?.pages ? 
-                        Object.entries(userRoleData.pages)
-                          .filter(([_, access]) => access.accessLevel !== 'none')
-                          .map(([pageKey, access]) => ({
-                            page: pageLabel(pageKey),
-                            accessLevel: access.accessLevel
-                          })) : [];
+                      const accessiblePages = userRoleData?.permissions ? 
+                        userRoleData.permissions.map(p => ({
+                          page: p,
+                          accessLevel: 'admin'
+                        })) : [];
                       
                       return (
                         <TableRow key={user.id}>
@@ -739,73 +433,12 @@ export default function ClientUsersPage() {
                 placeholder="Brief description of the role"
               />
             </div>
-            {/* Permissions */}
-            <div className="grid gap-2">
-              <Label>Permissions</Label>
-              <div className="grid grid-cols-2 gap-4 pt-2">
-                {pageGroups.map(group => (
-                  <div key={group.label} className="p-4 border rounded-lg">
-                    <div className="flex justify-between items-center mb-2">
-                      <h4 className="font-medium mr-2">{group.label}</h4>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="link"
-                          size="sm"
-                          className="h-auto p-0"
-                          onClick={() => {
-                            const newPermissions = [...new Set([...selectedPermissions, ...group.items])];
-                            setSelectedPermissions(newPermissions);
-                          }}
-                        >
-                          Select all
-                        </Button>
-                        <Button
-                          variant="link"
-                          size="sm"
-                          className="h-auto p-0"
-                          onClick={() => {
-                            const newPermissions = selectedPermissions.filter(p => !group.items.includes(p));
-                            setSelectedPermissions(newPermissions);
-                          }}
-                        >
-                          Clear
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      {group.items.map((value) => (
-                        <div key={value} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`add-role-${value}`}
-                            checked={selectedPermissions.includes(value)}
-                            onCheckedChange={(checked) => {
-                              const isChecked = checked === true;
-                              if (isChecked) {
-                                setSelectedPermissions([...selectedPermissions, value]);
-                              } else {
-                                setSelectedPermissions(selectedPermissions.filter(v => v !== value));
-                              }
-                            }}
-                          />
-                          <label
-                            htmlFor={`add-role-${value}`}
-                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                          >
-                            {pageLabel(value)}
-                          </label>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsAddRoleDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleAddRole}>Add Role</Button>
+            <Button>Add Role</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -844,67 +477,6 @@ export default function ClientUsersPage() {
                   onChange={(e) => setRoleToEdit({ ...roleToEdit, description: e.target.value })}
                   placeholder="Brief description of the role"
                 />
-              </div>
-              {/* Permissions */}
-              <div className="grid gap-2">
-                <Label>Permissions</Label>
-                <div className="grid grid-cols-2 gap-4 pt-2">
-                  {pageGroups.map(group => (
-                    <div key={group.label} className="p-4 border rounded-lg">
-                      <div className="flex justify-between items-center mb-2">
-                        <h4 className="font-medium mr-2">{group.label}</h4>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="link"
-                            size="sm"
-                            className="h-auto p-0"
-                            onClick={() => {
-                              const newPermissions = [...new Set([...selectedPermissions, ...group.items])];
-                              setSelectedPermissions(newPermissions);
-                            }}
-                          >
-                            Select all
-                          </Button>
-                          <Button
-                            variant="link"
-                            size="sm"
-                            className="h-auto p-0"
-                            onClick={() => {
-                              const newPermissions = selectedPermissions.filter(p => !group.items.includes(p));
-                              setSelectedPermissions(newPermissions);
-                            }}
-                          >
-                            Clear
-                          </Button>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        {group.items.map((value) => (
-                          <div key={value} className="flex items-center space-x-2">
-                            <Checkbox
-                              id={`edit-role-${value}`}
-                              checked={selectedPermissions.includes(value)}
-                              onCheckedChange={(checked) => {
-                                const isChecked = checked === true;
-                                if (isChecked) {
-                                  setSelectedPermissions([...selectedPermissions, value]);
-                                } else {
-                                  setSelectedPermissions(selectedPermissions.filter(v => v !== value));
-                                }
-                              }}
-                            />
-                            <label
-                              htmlFor={`edit-role-${value}`}
-                              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                            >
-                              {pageLabel(value)}
-                            </label>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
               </div>
             </div>
           )}
@@ -956,24 +528,6 @@ export default function ClientUsersPage() {
                   <SelectContent>
                     <SelectItem value="admin">Admin</SelectItem>
                     <SelectItem value="client_user">Client User</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="edit-store">Store</Label>
-                <Select
-                  value={editingUser.store_id || ''}
-                  onValueChange={(value) => setEditingUser({ ...editingUser, store_id: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a store" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clientStores.map((store) => (
-                      <SelectItem key={store.id} value={store.id}>
-                        {store.name}
-                      </SelectItem>
-                    ))}
                   </SelectContent>
                 </Select>
               </div>

@@ -3,16 +3,17 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { FileUpload } from '@/components/ui/file-upload';
 import { useAuth } from '@/contexts/AuthContext';
 import { useStore } from '@/contexts/StoreContext';
 import { api, CreatePurchaseRequest } from '@/lib/api';
 import { useEffect } from 'react';
+import Image from "next/image";
 
 interface Purchase {
   ref_num: string;
@@ -27,41 +28,12 @@ interface Purchase {
 }
 
 export default function PurchasesPage() {
-  const { user, token, selectedStore } = useAuth();
+  const { user, token } = useAuth();
   const { currentStore } = useStore();
   const [purchases, setPurchases] = useState<Purchase[]>([]);
-  const [searchRefNum, setSearchRefNum] = useState('');
-  const [searchDescription, setSearchDescription] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const pageSize = 10;
-
-  useEffect(() => {
-    const fetchPurchases = async () => {
-      if (token && user?.client_id && selectedStore) {
-        console.log('Fetching purchases for store:', selectedStore);
-        try {
-          const response = await api.getPurchasesByClient(
-            token,
-            user.client_id,
-            selectedStore,
-            searchRefNum,
-            searchDescription,
-            currentPage,
-            pageSize
-          );
-          setPurchases(response.purchases);
-          setTotalPages(Math.ceil(response.count / pageSize));
-        } catch (error) {
-          console.error("Failed to fetch purchases:", error);
-        }
-      }
-    };
-
-    fetchPurchases();
-  }, [token, user?.client_id, selectedStore, searchRefNum, searchDescription, currentPage]);
-
-  const [newPurchase, setNewPurchase] = useState({ 
+  const [filteredPurchases, setFilteredPurchases] = useState<Purchase[]>([]);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [newPurchase, setNewPurchase] = useState({
     ref_num: '',
     date: new Date().toISOString().split('T')[0],
     amount: '', 
@@ -72,9 +44,37 @@ export default function PurchasesPage() {
     otherCategory: ''
   });
   const [purchaseDocument, setPurchaseDocument] = useState<File | null>(null);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingPurchase, setEditingPurchase] = useState<Purchase | null>(null);
   const [deletingPurchase, setDeletingPurchase] = useState<Purchase | null>(null);
+  const [searchRefNum, setSearchRefNum] = useState('');
+  const [searchDescription, setSearchDescription] = useState('');
+
+  useEffect(() => {
+    const fetchPurchases = async () => {
+      if (!token || !currentStore || !currentStore.id || !user) return;
+      try {
+        const response = await api.getPurchasesByClient(token, user.client_id, currentStore.id);
+        setPurchases(response.purchases);
+      } catch (error) {
+        console.error("Error fetching purchases:", error);
+      }
+    };
+    fetchPurchases();
+  }, [token, currentStore, user]);
+
+  useEffect(() => {
+    let filtered = purchases;
+
+    if (searchRefNum) {
+      filtered = filtered.filter(p => p.ref_num.toLowerCase().includes(searchRefNum.toLowerCase()));
+    }
+
+    if (searchDescription) {
+      filtered = filtered.filter(p => p.description.toLowerCase().includes(searchDescription.toLowerCase()));
+    }
+
+    setFilteredPurchases(filtered);
+  }, [purchases, searchRefNum, searchDescription]);
 
   const handleCreatePurchase = async () => {
     if (!newPurchase.amount || !newPurchase.description.trim() || !newPurchase.supplier.trim()) {
@@ -142,8 +142,14 @@ export default function PurchasesPage() {
   };
 
   const handleUpdatePurchase = async () => {
-    if (!editingPurchase || !token) return;
-
+    if (!editingPurchase || !editingPurchase.ref_num || !token) return;
+  
+    // Ensure all required fields are filled
+    if (!editingPurchase.purchase_date || !editingPurchase.description || !editingPurchase.amount) {
+        alert('Please fill all required fields');
+        return;
+    }
+  
     try {
       const updatedPurchase = await api.updatePurchase(token, editingPurchase.ref_num, {
         purchase_date: editingPurchase.purchase_date,
@@ -154,7 +160,7 @@ export default function PurchasesPage() {
         category: editingPurchase.category,
         other_category: editingPurchase.other_category,
       });
-
+  
       setPurchases(purchases.map(p => p.ref_num === editingPurchase.ref_num ? { ...p, ...updatedPurchase.purchase } : p));
       setEditingPurchase(null);
     } catch (error) {
@@ -164,7 +170,7 @@ export default function PurchasesPage() {
   };
 
   const handleDeletePurchase = async () => {
-    if (!deletingPurchase || !token) return;
+    if (!deletingPurchase || !deletingPurchase.ref_num || !token) return;
 
     try {
       await api.deletePurchase(token, deletingPurchase.ref_num);
@@ -176,7 +182,7 @@ export default function PurchasesPage() {
     }
   };
 
-  const totalPurchases = purchases.reduce((sum, purchase) => sum + purchase.amount, 0);
+  const totalPurchases = filteredPurchases.reduce((sum, purchase) => sum + purchase.amount, 0);
 
   return (
     <div className="space-y-6">
@@ -312,7 +318,6 @@ export default function PurchasesPage() {
                 <div className="col-span-3">
                   <FileUpload 
                     onFileChange={setPurchaseDocument}
-                    value={purchaseDocument}
                   />
                 </div>
               </div>
@@ -436,7 +441,7 @@ export default function PurchasesPage() {
             {new Intl.NumberFormat('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(totalPurchases)}
           </div>
           <p className="text-sm text-gray-600 mt-2">
-            {purchases.length} transactions recorded
+            {filteredPurchases.length} transactions recorded
           </p>
         </CardContent>
       </Card>
@@ -473,7 +478,7 @@ export default function PurchasesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {purchases.map((purchase) => (
+              {filteredPurchases.map((purchase) => (
                 <TableRow key={purchase.ref_num}>
                   <TableCell>{purchase.ref_num}</TableCell>
                   <TableCell>{new Date(purchase.purchase_date).toLocaleDateString()}</TableCell>
@@ -492,7 +497,7 @@ export default function PurchasesPage() {
                   <TableCell>
                     {purchase.supp_doc_url && (
                       <a href={purchase.supp_doc_url} target="_blank" rel="noopener noreferrer">
-                        <img src={purchase.supp_doc_url} alt="Document" style={{ width: '50px', height: 'auto' }} />
+                        <Image src={purchase.supp_doc_url} alt="Document" width={50} height={50} style={{ height: 'auto' }} />
                       </a>
                     )}
                   </TableCell>
@@ -549,7 +554,7 @@ export default function PurchasesPage() {
                               <Label>Payment Method</Label>
                               <Select 
                                 value={editingPurchase.payment_method} 
-                                onValueChange={(value) => setEditingPurchase({ ...editingPurchase, payment_method: value as any })}
+                                onValueChange={(value) => setEditingPurchase({ ...editingPurchase, payment_method: value as 'cash' | 'card' | 'check' })}
                               >
                                 <SelectTrigger className="col-span-3">
                                   <SelectValue />

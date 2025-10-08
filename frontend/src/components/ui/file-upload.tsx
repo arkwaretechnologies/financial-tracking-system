@@ -3,14 +3,14 @@
 import React, { useState, useRef } from 'react';
 import { Button } from './button';
 import { Camera, Upload, X } from 'lucide-react';
+import Image from 'next/image';
 
 interface FileUploadProps {
   onFileChange: (file: File | null) => void;
-  value?: File | null;
   previewUrl?: string | null;
 }
 
-export function FileUpload({ onFileChange, value, previewUrl: initialPreviewUrl }: FileUploadProps) {
+export function FileUpload({ onFileChange, previewUrl: initialPreviewUrl }: FileUploadProps) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(initialPreviewUrl || null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -54,9 +54,11 @@ export function FileUpload({ onFileChange, value, previewUrl: initialPreviewUrl 
     <div className="space-y-2">
       {previewUrl ? (
         <div className="relative">
-          <img 
+          <Image 
             src={previewUrl} 
             alt="Document preview" 
+            width={200}
+            height={200}
             className="max-h-48 rounded-md object-contain border border-gray-200"
           />
           <button
