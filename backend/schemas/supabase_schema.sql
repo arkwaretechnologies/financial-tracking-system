@@ -33,6 +33,21 @@ CREATE TABLE users (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Create sales table
+CREATE TABLE sales (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    client_id UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+    store_id UUID REFERENCES stores(id) ON DELETE SET NULL,
+    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    description TEXT,
+    payment_method TEXT,
+    amount NUMERIC(10, 2) NOT NULL,
+    sales_date TIMESTAMPTZ NOT NULL,
+    supporting_docs_path TEXT,
+    supporting_docs_bucket TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Create transactions table
 CREATE TABLE transactions (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -58,6 +73,7 @@ ALTER TABLE clients ENABLE ROW LEVEL SECURITY;
 ALTER TABLE stores ENABLE ROW LEVEL SECURITY;
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sales ENABLE ROW LEVEL SECURITY;
 
 -- Clients policies
 CREATE POLICY "Super admin can view all clients" ON clients
@@ -114,6 +130,21 @@ CREATE POLICY "Users can create transactions for their stores" ON transactions
             WHERE stores.id = transactions.store_id 
             AND stores.client_id = (SELECT client_id FROM users WHERE id = auth.uid())
         ) OR
+        EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'super_admin')
+    );
+
+-- Sales policies
+CREATE POLICY "Users can view sales for their client" ON sales
+    FOR SELECT TO authenticated
+    USING (
+        client_id = (SELECT client_id FROM users WHERE id = auth.uid()) OR
+        EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'super_admin')
+    );
+
+CREATE POLICY "Users can create sales for their client" ON sales
+    FOR INSERT TO authenticated
+    WITH CHECK (
+        client_id = (SELECT client_id FROM users WHERE id = auth.uid()) OR
         EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'super_admin')
     );
 

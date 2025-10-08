@@ -1,101 +1,181 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-
-interface Expense {
-  id: string;
-  date: string;
-  amount: number;
-  description: string;
-  category: 'utilities' | 'rent' | 'salaries' | 'marketing' | 'supplies' | 'maintenance' | 'other';
-  store_name: string;
-  paid_to: string;
-}
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { FileUpload } from '@/components/ui/file-upload';
+import { useStore } from '@/contexts/StoreContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { api, CreateExpenseRequest, Expense } from '@/lib/api';
 
 export default function ExpensesPage() {
-  const [expenses, setExpenses] = useState<Expense[]>([
-    {
-      id: '1',
-      date: '2024-12-20',
-      amount: 150.00,
-      description: 'Electricity bill',
-      category: 'utilities',
-      store_name: 'Main Store',
-      paid_to: 'City Electric Company'
-    },
-    {
-      id: '2',
-      date: '2024-12-15',
-      amount: 1200.00,
-      description: 'Monthly rent',
-      category: 'rent',
-      store_name: 'Downtown Branch',
-      paid_to: 'Property Management LLC'
-    },
-    {
-      id: '3',
-      date: '2024-12-10',
-      amount: 75.50,
-      description: 'Office supplies',
-      category: 'supplies',
-      store_name: 'Main Store',
-      paid_to: 'Office Depot'
-    }
-  ]);
+  const { currentStore } = useStore();
+  const { user, token, selectedStore } = useAuth();
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [filteredExpenses, setFilteredExpenses] = useState<Expense[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [newExpense, setNewExpense] = useState({ 
+    ref_num: '',
+    date: new Date().toISOString().split('T')[0],
     amount: '', 
     description: '', 
-    category: 'utilities' as 'utilities' | 'rent' | 'salaries' | 'marketing' | 'supplies' | 'maintenance' | 'other',
-    store_id: '', 
-    paid_to: ''
+    paid_to: '',
+    payment_method: 'cash' as 'cash' | 'card' | 'check',
   });
+  const [expenseDocument, setExpenseDocument] = useState<File | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [searchRefNum, setSearchRefNum] = useState('');
+  const [searchDescription, setSearchDescription] = useState('');
 
-  // Mock stores data
-  const stores = [
-    { id: '1', name: 'Main Store' },
-    { id: '2', name: 'Downtown Branch' },
-    { id: '3', name: 'Westside Store' },
-  ];
+  useEffect(() => {
+    const fetchExpenses = async () => {
+      if (user && token && selectedStore) {
+        setIsLoading(true);
+        try {
+          const response = await api.getExpenses(token, user.client_id, selectedStore, '', '');
+          console.log('Raw API response:', response);
+          if (Array.isArray(response)) {
+            setExpenses(response);
+            setFilteredExpenses(response);
+          } else {
+            setExpenses([]);
+            setFilteredExpenses([]);
+          }
+        } catch (error) {
+          console.error("Failed to fetch expenses:", error);
+          setExpenses([]);
+          setFilteredExpenses([]);
+        } finally {
+          setIsLoading(false);
+        }
+      }
+    };
 
-  const handleCreateExpense = async () => {
-    if (!newExpense.amount || !newExpense.description.trim() || !newExpense.paid_to.trim() || !newExpense.store_id.trim()) return;
+    if (selectedStore) { // Only fetch if a store is selected
+      fetchExpenses();
+    } else {
+      // If no store is selected, don't show loading, just an empty state.
+      setIsLoading(false);
+      setExpenses([]);
+      setFilteredExpenses([]);
+    }
+  }, [user, token, selectedStore]);
+
+  useEffect(() => {
+    let filtered = expenses;
+
+    if (searchRefNum) {
+      filtered = filtered.filter(expense =>
+        expense.ref_num.toLowerCase().includes(searchRefNum.toLowerCase())
+      );
+    }
+
+    if (searchDescription) {
+      filtered = filtered.filter(expense =>
+        expense.description.toLowerCase().includes(searchDescription.toLowerCase())
+      );
+    }
+
+    setFilteredExpenses(filtered);
+  }, [searchRefNum, searchDescription, expenses]);
+
+  const handleCreateExpense = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!newExpense.ref_num.trim() || !newExpense.amount || !newExpense.description.trim() || !newExpense.paid_to.trim() || !currentStore || !token || !user) return;
 
     try {
-      const store = stores.find(s => s.id === newExpense.store_id);
-      const expense: Expense = {
-        id: Date.now().toString(),
-        date: new Date().toISOString().split('T')[0],
-        amount: parseFloat(newExpense.amount),
+      let image_base64: string | null = null;
+      if (expenseDocument) {
+        const toBase64 = (file: File): Promise<string> => new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.readAsDataURL(file);
+          reader.onload = () => resolve((reader.result as string).split(',')[1]);
+          reader.onerror = error => reject(error);
+        });
+        image_base64 = await toBase64(expenseDocument);
+      }
+
+      const expenseData: CreateExpenseRequest = {
+        ref_num: newExpense.ref_num,
+        client_id: currentStore.client_id,
+        store_id: currentStore.id,
+        user_id: user.id,
         description: newExpense.description,
-        category: newExpense.category,
-        store_name: store?.name || 'Unknown',
-        paid_to: newExpense.paid_to
+        paid_to: newExpense.paid_to,
+        payment_method: newExpense.payment_method,
+        amount: parseFloat(newExpense.amount),
+        expense_date: newExpense.date,
+        image_base64: image_base64 || undefined,
+        image_filename: expenseDocument ? expenseDocument.name : undefined,
       };
       
-      setExpenses([expense, ...expenses]);
-      setNewExpense({ amount: '', description: '', category: 'utilities', store_id: '', paid_to: '' });
+      const newExpenseRecord = await api.createExpense(token, expenseData);
+      if (newExpenseRecord) {
+        const updatedExpenses = [newExpenseRecord, ...expenses];
+        setExpenses(updatedExpenses);
+        setFilteredExpenses(updatedExpenses);
+      }
+      setNewExpense({ 
+        ref_num: '',
+        date: new Date().toISOString().split('T')[0],
+        amount: '', 
+        description: '', 
+        paid_to: '',
+        payment_method: 'cash' as 'cash' | 'card' | 'check',
+      });
+      setExpenseDocument(null);
       setIsDialogOpen(false);
     } catch (error) {
       console.error('Error creating expense:', error);
     }
   };
 
-  const totalExpenses = expenses.reduce((sum, expense) => sum + expense.amount, 0);
+  const handleUpdateExpense = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!editingExpense || !token) return;
+
+    try {
+      const updatedExpense = await api.updateExpense(token, editingExpense.ref_num, editingExpense);
+      setExpenses(expenses.map(exp => exp.ref_num === editingExpense.ref_num ? updatedExpense : exp));
+      setIsEditing(false);
+      setEditingExpense(null);
+    } catch (error) {
+      console.error('Error updating expense:', error);
+    }
+  };
+
+  const handleDeleteExpense = async (refNum: string) => {
+    if (!token) return;
+
+    try {
+      await api.deleteExpense(token, refNum);
+      const updatedExpenses = expenses.filter(exp => exp.ref_num !== refNum);
+      setExpenses(updatedExpenses);
+      setFilteredExpenses(updatedExpenses);
+    } catch (error) {
+      console.error('Error deleting expense:', error);
+    }
+  };
+
+  const totalExpenses = filteredExpenses.reduce((sum, expense) => sum + (expense.amount || 0), 0);
+
+  if (isLoading) {
+    return <div>Loading...</div>; // Or a spinner component
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Expenses Management</h1>
-          <p className="mt-2 text-gray-600">Record and track your business expenses</p>
+          <p className="mt-2 text-gray-600">Record and track your expense transactions</p>
         </div>
         
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -103,16 +183,80 @@ export default function ExpensesPage() {
             <Button>Record New Expense</Button>
           </DialogTrigger>
           <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Record New Expense</DialogTitle>
+            <form onSubmit={handleCreateExpense}>
+              <DialogHeader>
+                <DialogTitle>Record New Expense</DialogTitle>
               <DialogDescription>
                 Add a new expense transaction to your records.
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="amount" className="text-right">
-                  Amount ($)
+                <Label htmlFor="ref_num">
+                  Reference No.
+                </Label>
+                <Input
+                  id="ref_num"
+                  value={newExpense.ref_num}
+                  onChange={(e) => setNewExpense({...newExpense, ref_num: e.target.value})}
+                  className="col-span-3"
+                  placeholder="Enter reference number"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="date">
+                  Expense Date
+                </Label>
+                <Input
+                  id="date"
+                  type="date"
+                  value={newExpense.date}
+                  onChange={(e) => setNewExpense({...newExpense, date: e.target.value})}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="description">
+                  Description
+                </Label>
+                <Input
+                  id="description"
+                  value={newExpense.description}
+                  onChange={(e) => setNewExpense({...newExpense, description: e.target.value})}
+                  className="col-span-3"
+                  placeholder="What was the expense for?"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="paid_to">
+                  Paid To
+                </Label>
+                <Input
+                  id="paid_to"
+                  value={newExpense.paid_to}
+                  onChange={(e) => setNewExpense({...newExpense, paid_to: e.target.value})}
+                  className="col-span-3"
+                  placeholder="Who was paid?"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="payment">
+                  Payment Method
+                </Label>
+                <Select value={newExpense.payment_method} onValueChange={(value) => setNewExpense({...newExpense, payment_method: value as 'cash' | 'card' | 'check'})}>
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Select payment method" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="card">Card</SelectItem>
+                    <SelectItem value="check">Check</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="amount">
+                  Amount
                 </Label>
                 <Input
                   id="amount"
@@ -125,74 +269,23 @@ export default function ExpensesPage() {
                 />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="description" className="text-right">
-                  Description
+                <Label htmlFor="document">
+                  Document Image
                 </Label>
-                <Input
-                  id="description"
-                  value={newExpense.description}
-                  onChange={(e) => setNewExpense({...newExpense, description: e.target.value})}
-                  className="col-span-3"
-                  placeholder="What was the expense for?"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="paid_to" className="text-right">
-                  Paid To
-                </Label>
-                <Input
-                  id="paid_to"
-                  value={newExpense.paid_to}
-                  onChange={(e) => setNewExpense({...newExpense, paid_to: e.target.value})}
-                  className="col-span-3"
-                  placeholder="Who received the payment?"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="store" className="text-right">
-                  Store
-                </Label>
-                <Select value={newExpense.store_id} onValueChange={(value) => setNewExpense({...newExpense, store_id: value})}>
-                  <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder="Select store" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {stores.map((store) => (
-                      <SelectItem key={store.id} value={store.id}>
-                        {store.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="category" className="text-right">
-                  Category
-                </Label>
-                <Select value={newExpense.category} onValueChange={(value) => setNewExpense({...newExpense, category: value as 'utilities' | 'rent' | 'salaries' | 'marketing' | 'supplies' | 'maintenance' | 'other'})}>
-                  <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder="Select category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="utilities">Utilities</SelectItem>
-                    <SelectItem value="rent">Rent</SelectItem>
-                    <SelectItem value="salaries">Salaries</SelectItem>
-                    <SelectItem value="marketing">Marketing</SelectItem>
-                    <SelectItem value="supplies">Supplies</SelectItem>
-                    <SelectItem value="maintenance">Maintenance</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="col-span-3">
+                  <FileUpload 
+                    onFileChange={setExpenseDocument}
+                    value={expenseDocument}
+                  />
+                </div>
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleCreateExpense} disabled={!newExpense.amount || !newExpense.description.trim() || !newExpense.paid_to.trim() || !newExpense.store_id.trim()}>
-                Record Expense
+              <Button type="submit" disabled={!newExpense.ref_num.trim() || !newExpense.amount || !newExpense.description.trim() || !newExpense.paid_to.trim()}>
+                Save Expense
               </Button>
             </DialogFooter>
+            </form>
           </DialogContent>
         </Dialog>
       </div>
@@ -203,11 +296,9 @@ export default function ExpensesPage() {
           <CardDescription>Total expenses for the current period</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="text-3xl font-bold text-red-600">
-            ${totalExpenses.toFixed(2)}
-          </div>
-          <p className="text-sm text-gray-600 mt-2">
-            {expenses.length} expense transactions recorded
+          <div className="text-2xl font-bold">{new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(totalExpenses)}</div>
+          <p className="text-xs text-muted-foreground">
+            {filteredExpenses.length} transactions recorded
           </p>
         </CardContent>
       </Card>
@@ -218,45 +309,52 @@ export default function ExpensesPage() {
           <CardDescription>A list of all expense transactions</CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="flex space-x-4 mb-4">
+            <Input
+              placeholder="Search by reference number..."
+              value={searchRefNum}
+              onChange={(e) => setSearchRefNum(e.target.value)}
+            />
+            <Input
+              placeholder="Search by description..."
+              value={searchDescription}
+              onChange={(e) => setSearchDescription(e.target.value)}
+            />
+          </div>
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Reference No.</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Description</TableHead>
-                <TableHead>Category</TableHead>
                 <TableHead>Paid To</TableHead>
                 <TableHead>Store</TableHead>
-                <TableHead>Amount</TableHead>
+                <TableHead>Payment Method</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
+                <TableHead>Document</TableHead>
+                <TableHead className="text-center">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {expenses.map((expense) => (
-                <TableRow key={expense.id}>
-                  <TableCell>{new Date(expense.date).toLocaleDateString()}</TableCell>
+              {filteredExpenses.map((expense) => (
+                <TableRow key={expense.ref_num}>
+                  <TableCell>{expense.ref_num}</TableCell>
+                  <TableCell>{new Date(expense.expense_date).toLocaleDateString()}</TableCell>
                   <TableCell>{expense.description}</TableCell>
-                  <TableCell>
-                    <span className={`px-2 py-1 rounded-full text-xs ${
-                      expense.category === 'utilities' 
-                        ? 'bg-blue-100 text-blue-800' 
-                        : expense.category === 'rent'
-                        ? 'bg-purple-100 text-purple-800'
-                        : expense.category === 'salaries'
-                        ? 'bg-red-100 text-red-800'
-                        : expense.category === 'marketing'
-                        ? 'bg-green-100 text-green-800'
-                        : expense.category === 'supplies'
-                        ? 'bg-yellow-100 text-yellow-800'
-                        : expense.category === 'maintenance'
-                        ? 'bg-indigo-100 text-indigo-800'
-                        : 'bg-gray-100 text-gray-800'
-                    }`}>
-                      {expense.category.toUpperCase()}
-                    </span>
-                  </TableCell>
                   <TableCell>{expense.paid_to}</TableCell>
                   <TableCell>{expense.store_name}</TableCell>
-                  <TableCell className="font-medium text-red-600">
-                    ${expense.amount.toFixed(2)}
+                  <TableCell>{expense.payment_method}</TableCell>
+                  <TableCell className="text-right">{new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(expense.amount)}</TableCell>
+                  <TableCell>
+                    {expense.supp_doc_url && 
+                      <a href={expense.supp_doc_url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
+                        View
+                      </a>
+                    }
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Button variant="outline" size="sm" onClick={() => { setEditingExpense(expense); setIsEditing(true); }}>Edit</Button>
+                    <Button variant="destructive" size="sm" className="ml-2" onClick={() => handleDeleteExpense(expense.ref_num)}>Delete</Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -264,6 +362,54 @@ export default function ExpensesPage() {
           </Table>
         </CardContent>
       </Card>
+
+      <Dialog open={isEditing} onOpenChange={setIsEditing}>
+        <DialogContent>
+          <form onSubmit={handleUpdateExpense}>
+            <DialogHeader>
+              <DialogTitle>Edit Expense</DialogTitle>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-ref_num">Reference No.</Label>
+                <Input id="edit-ref_num" value={editingExpense?.ref_num} readOnly className="col-span-3" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-date">Expense Date</Label>
+                <Input id="edit-date" type="date" value={editingExpense?.expense_date.split('T')[0]} onChange={(e) => setEditingExpense(editingExpense ? { ...editingExpense, expense_date: e.target.value } : null)} className="col-span-3" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-description">Description</Label>
+                <Input id="edit-description" value={editingExpense?.description} onChange={(e) => setEditingExpense(editingExpense ? { ...editingExpense, description: e.target.value } : null)} className="col-span-3" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-paid_to">Paid To</Label>
+                <Input id="edit-paid_to" value={editingExpense?.paid_to} onChange={(e) => setEditingExpense(editingExpense ? { ...editingExpense, paid_to: e.target.value } : null)} className="col-span-3" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-payment">Payment Method</Label>
+                <Select value={editingExpense?.payment_method} onValueChange={(value) => setEditingExpense(editingExpense ? { ...editingExpense, payment_method: value } : null)}>
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Select payment method" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="card">Card</SelectItem>
+                    <SelectItem value="check">Check</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-amount">Amount</Label>
+                <Input id="edit-amount" type="number" step="0.01" value={editingExpense?.amount} onChange={(e) => setEditingExpense(editingExpense ? { ...editingExpense, amount: parseFloat(e.target.value) } : null)} className="col-span-3" />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="submit">Save Changes</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
