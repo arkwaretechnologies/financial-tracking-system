@@ -46,8 +46,6 @@ export default function DashboardNav() {
     { title: 'Expenses', href: '/dashboard/expenses', icon: ShoppingBag, roles: ['admin', 'client_user'] },
     { title: 'Reports', href: '/dashboard/reports', icon: BarChart3, roles: ['admin', 'client_user'] },
     { title: 'Users', href: '/dashboard/users', icon: Users, roles: ['admin'] },
-    { title: 'Stores', href: '/dashboard/stores', icon: Building, roles: ['admin'] },
-    { title: 'Settings', href: '/dashboard/settings', icon: Settings, roles: ['admin', 'client_user'] },
   ];
 
   // Filter menu items based on user role
