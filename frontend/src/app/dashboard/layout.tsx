@@ -34,8 +34,8 @@ export default function DashboardLayout({
   return (
     <div className="min-h-screen bg-gray-50 flex">
       <DashboardNav />
-      <div className="flex-1 lg:ml-0">
-        <main className="flex-1 p-4 lg:p-8">
+      <div className="flex-1 lg:ml-64">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 pt-16 lg:pt-8">
           {children}
         </main>
       </div>

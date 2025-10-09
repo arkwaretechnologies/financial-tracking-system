@@ -30,10 +30,10 @@ export default function SuperAdminLoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 py-8 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-6">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900">Financial Tracking System</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Financial Tracking System</h1>
           <p className="mt-2 text-gray-600">Super Admin Portal</p>
         </div>
         

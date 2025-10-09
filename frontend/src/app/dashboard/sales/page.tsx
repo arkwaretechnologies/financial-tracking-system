@@ -159,7 +159,7 @@ export default function SalesPage() {
           <DialogTrigger asChild>
             <Button>Record New Sale</Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-[95vw] sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Record New Sale</DialogTitle>
               <DialogDescription>
@@ -167,7 +167,7 @@ export default function SalesPage() {
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-4">
                 <Label htmlFor="ref_num">
                   Reference No.
                 </Label>
@@ -175,11 +175,11 @@ export default function SalesPage() {
                   id="ref_num"
                   value={newSale.ref_num}
                   onChange={(e) => setNewSale({...newSale, ref_num: e.target.value})}
-                  className="col-span-3"
+                  className="sm:col-span-3"
                   placeholder="Enter reference number"
                 />
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-4">
                 <Label htmlFor="date">
                   Sales Date
                 </Label>
@@ -188,10 +188,10 @@ export default function SalesPage() {
                   type="date"
                   value={newSale.date}
                   onChange={(e) => setNewSale({...newSale, date: e.target.value})}
-                  className="col-span-3"
+                  className="sm:col-span-3"
                 />
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-4">
                 <Label htmlFor="description">
                   Description
                 </Label>
@@ -199,11 +199,11 @@ export default function SalesPage() {
                   id="description"
                   value={newSale.description}
                   onChange={(e) => setNewSale({...newSale, description: e.target.value})}
-                  className="col-span-3"
+                  className="sm:col-span-3"
                   placeholder="What was sold?"
                 />
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-4">
                 <Label htmlFor="amount">
                   Amount
                 </Label>
@@ -213,16 +213,16 @@ export default function SalesPage() {
                   step="0.01"
                   value={newSale.amount}
                   onChange={(e) => setNewSale({...newSale, amount: e.target.value})}
-                  className="col-span-3"
+                  className="sm:col-span-3"
                   placeholder="0.00"
                 />
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-4">
                 <Label htmlFor="payment">
                   Payment Method
                 </Label>
                 <Select value={newSale.payment_method} onValueChange={(value) => setNewSale({...newSale, payment_method: value as 'cash' | 'card' | 'transfer'})}>
-                  <SelectTrigger className="col-span-3">
+                  <SelectTrigger className="sm:col-span-3">
                     <SelectValue placeholder="Select payment method" />
                   </SelectTrigger>
                   <SelectContent>
@@ -232,11 +232,11 @@ export default function SalesPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-4">
                 <Label htmlFor="document">
                   Document Image
                 </Label>
-                <div className="col-span-3">
+                <div className="sm:col-span-3">
                   <FileUpload 
                     onFileChange={setSaleDocument}
                   />
@@ -259,7 +259,7 @@ export default function SalesPage() {
 
       {/* Edit Sale Dialog */}
       <Dialog open={!!editingSale} onOpenChange={() => setEditingSale(null)}>
-        <DialogContent>
+        <DialogContent className="max-w-[95vw] sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Sale</DialogTitle>
           </DialogHeader>
@@ -353,7 +353,7 @@ export default function SalesPage() {
         </CardHeader>
         <CardContent>
           {/* Search and Filter UI */}
-          <div className="flex items-center space-x-4 mb-4">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 mb-4">
             <div className="flex-1">
               <Input
                 placeholder="Search by reference number..."
@@ -369,15 +369,17 @@ export default function SalesPage() {
               />
             </div>
           </div>
-          <Table>
+          <div className="overflow-x-auto">
+            <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Reference No.</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Description</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Payment Method</TableHead>
                 <TableHead>Store</TableHead>
+                <TableHead>Payment Method</TableHead>
+                <TableHead>Amount</TableHead>
+                <TableHead>Document</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -399,39 +401,47 @@ export default function SalesPage() {
                   <TableCell>
                     {sale.supp_doc_url && (
                       <a href={sale.supp_doc_url} target="_blank" rel="noopener noreferrer">
-                        <Image src={sale.supp_doc_url} alt="Sale Document" width={40} height={40} className="object-cover" />
+                        <Image src={sale.supp_doc_url} alt="Sale Document" width={40} height={40} className="object-cover rounded" />
                       </a>
                     )}
                   </TableCell>
                   <TableCell>
-                    <Button variant="outline" size="sm" className="mr-2" onClick={() => setEditingSale(sale)}>
-                      Edit
-                    </Button>
-                    <Button variant="destructive" size="sm" onClick={() => handleDeleteSale(sale.ref_num)}>
-                      Delete
-                    </Button>
+                    <div className="flex flex-col sm:flex-row gap-1">
+                      <Button variant="outline" size="sm" onClick={() => setEditingSale(sale)}>
+                        Edit
+                      </Button>
+                      <Button variant="destructive" size="sm" onClick={() => handleDeleteSale(sale.ref_num)}>
+                        Delete
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
-          <div className="flex items-center justify-end space-x-2 py-4">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-              disabled={currentPage === 1}
-            >
-              Previous
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-              disabled={currentPage === totalPages}
-            >
-              Next
-            </Button>
+          </div>
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4">
+            <div className="text-sm text-gray-600">
+              Page {currentPage} of {totalPages}
+            </div>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+              >
+                Next
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>

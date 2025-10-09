@@ -320,20 +320,21 @@ export default function ExpensesPage() {
               onChange={(e) => setSearchDescription(e.target.value)}
             />
           </div>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Reference No.</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Paid To</TableHead>
-                <TableHead>Store</TableHead>
-                <TableHead>Payment Method</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead>Document</TableHead>
-                <TableHead className="text-center">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Reference No.</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead>Paid To</TableHead>
+                  <TableHead>Store</TableHead>
+                  <TableHead>Payment Method</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead>Document</TableHead>
+                  <TableHead className="text-center">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
             <TableBody>
               {filteredExpenses.map((expense) => (
                 <TableRow key={expense.ref_num}>
@@ -359,6 +360,7 @@ export default function ExpensesPage() {
               ))}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
 

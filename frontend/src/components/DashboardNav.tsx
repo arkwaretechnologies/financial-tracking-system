@@ -57,19 +57,29 @@ export default function DashboardNav() {
 
   return (
     <>
+      {/* Mobile menu button */}
       <button
         onClick={() => setSidebarOpen(true)}
-        className="lg:hidden fixed left-4 top-4 p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100"
+        className="lg:hidden fixed left-4 top-4 z-50 p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 bg-white shadow-md"
       >
         <Menu className="h-6 w-6" />
       </button>
 
+      {/* Backdrop overlay for mobile */}
+      {sidebarOpen && (
+        <div 
+          className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-30"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
       <div
         className={cn(
-          "fixed inset-0 z-40 lg:z-auto flex-none bg-white lg:static lg:block transition-all duration-300 ease-in-out",
+          "fixed inset-y-0 left-0 z-40 w-64 bg-white shadow-lg lg:shadow-none lg:static lg:block transition-all duration-300 ease-in-out",
           sidebarOpen
-            ? "translate-x-0 opacity-100"
-            : "-translate-x-full lg:translate-x-0 opacity-0 lg:opacity-100"
+            ? "translate-x-0"
+            : "-translate-x-full lg:translate-x-0"
         )}
       >
         <div className="flex items-center justify-between h-16 px-4 border-b">
@@ -110,7 +120,7 @@ export default function DashboardNav() {
           </Select>
         </div>
 
-        <div className="flex flex-col h-full">
+        <div className="flex flex-col h-full overflow-y-auto">
           <nav className="flex-1 px-4 py-4 space-y-2">
             {filteredNavItems.map((item) => {
               const isActive = pathname === item.href;
@@ -118,6 +128,7 @@ export default function DashboardNav() {
                 <Link
                   key={item.href}
                   href={item.href}
+                  onClick={() => setSidebarOpen(false)}
                   className={cn(
                     "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium",
                     isActive
@@ -157,6 +168,13 @@ export default function DashboardNav() {
               <LogOut className="h-5 w-5" />
               Logout
             </button>
+          </div>
+          
+          {/* Footer in sidebar */}
+          <div className="px-4 py-3 border-t border-gray-200">
+            <p className="text-xs text-gray-500 text-center">
+              Powered by Arkware Technologies ©{new Date().getFullYear()}
+            </p>
           </div>
         </div>
       </div>
