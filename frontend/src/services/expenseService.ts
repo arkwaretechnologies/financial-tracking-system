@@ -1,19 +1,5 @@
 import { api } from '@/lib/api';
-import { CreateExpenseRequest } from '@/lib/api';
-
-export interface Expense {
-  id: string;
-  client_id: string;
-  store_id: string;
-  user_id: string;
-  description: string;
-  paid_to: string;
-  payment_method: 'cash' | 'card' | 'check';
-  amount: number;
-  expense_date: string;
-  supp_doc_url?: string;
-  store_name?: string;
-}
+import { CreateExpenseRequest, Expense } from '@/lib/api';
 
 export const getExpensesByClient = async (token: string, clientId: string, storeId: string): Promise<Expense[]> => {
   const expenses = await api.getExpenses(token, clientId, storeId);
