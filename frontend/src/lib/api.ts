@@ -71,7 +71,7 @@ interface CreateSaleRequest {
   client_id: string;
   store_id?: string;
   description?: string;
-  payment_method?: 'cash' | 'card' | 'transfer' | string;
+  payment_method?: 'cash' | 'card' | 'check' | 'transfer' | string;
   amount: number;
   sales_date: string; // YYYY-MM-DD
   image_base64?: string;
@@ -85,7 +85,7 @@ export interface CreatePurchaseRequest {
   user_id?: string;
   description?: string;
   supplier?: string;
-  payment_method?: 'cash' | 'card' | 'check' | string;
+  payment_method?: 'cash' | 'card' | 'check' | 'transfer' | string;
   amount: number;
   purchase_date: string; // YYYY-MM-DD
   image_base64?: string;
@@ -117,7 +117,7 @@ export interface CreateExpenseRequest {
   user_id: string;
   description: string;
   paid_to: string;
-  payment_method: 'cash' | 'card' | 'check';
+  payment_method: 'cash' | 'card' | 'check' | 'transfer';
   amount: number;
   expense_date: string;
   image_base64?: string;
