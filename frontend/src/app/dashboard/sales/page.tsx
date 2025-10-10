@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { FileUpload } from '@/components/ui/file-upload';
 import { useAuth } from '@/contexts/AuthContext';
+import { useStore } from '@/contexts/StoreContext';
 import { api } from '@/lib/api';
 import { useEffect } from 'react';
 import Image from "next/image";
@@ -27,12 +28,13 @@ interface Sale {
 export default function SalesPage() {
   const [sales, setSales] = useState<Sale[]>([]);
   const { user, token } = useAuth();
+  const { currentStore } = useStore();
   const [newSale, setNewSale] = useState({
     ref_num: '',
     date: new Date().toISOString().split('T')[0],
     amount: '', 
     description: '', 
-    payment_method: 'cash' as 'cash' | 'card' | 'transfer'
+    payment_method: 'cash' as 'cash' | 'card' | 'transfer' | 'check'
   });
   const [saleDocument, setSaleDocument] = useState<File | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -45,9 +47,9 @@ export default function SalesPage() {
 
   useEffect(() => {
     const fetchSales = async () => {
-      if (token && user?.client_id) {
+      if (token && user?.client_id && currentStore?.id) {
         try {
-          const response = await api.getSalesByClient(token, user.client_id, 'all', searchRefNum, searchDescription, currentPage, pageSize);
+          const response = await api.getSalesByClient(token, user.client_id, currentStore.id, searchRefNum, searchDescription, currentPage, pageSize);
           setSales(response.sales);
           setTotalPages(Math.ceil(response.count / pageSize));
         } catch (error) {
@@ -57,8 +59,13 @@ export default function SalesPage() {
       }
     };
 
-    fetchSales();
-  }, [token, user?.client_id, searchRefNum, searchDescription, currentPage, pageSize]);
+    if (currentStore?.id) {
+      fetchSales();
+    } else {
+      setSales([]);
+      setTotalPages(1);
+    }
+  }, [token, user?.client_id, currentStore, searchRefNum, searchDescription, currentPage, pageSize]);
 
   const handleCreateSale = async () => {
     if (!newSale.ref_num.trim() || !newSale.amount || !newSale.description.trim()) return;
@@ -77,11 +84,11 @@ export default function SalesPage() {
       }
 
       // Persist to backend Supabase via API
-      if (token && user?.client_id) {
+      if (token && user?.client_id && currentStore?.id) {
         const newSaleData = {
           ref_num: newSale.ref_num,
           client_id: user.client_id,
-          store_id: user.store_id || undefined,
+          store_id: currentStore.id,
           description: newSale.description,
           payment_method: newSale.payment_method,
           amount: parseFloat(newSale.amount),
@@ -92,11 +99,15 @@ export default function SalesPage() {
 
         const response = await api.createSale(token, newSaleData);
 
-        // Optimistic UI update
-        setSales([response.sale, ...sales]);
+        // Optimistic UI update with store name
+        const newSaleWithStore = {
+          ...response.sale,
+          store_name: currentStore.name
+        };
+        setSales([newSaleWithStore, ...sales]);
 
       } else {
-        console.warn('No token or client_id available; sale was not created.');
+        console.warn('No token, client_id, or store selected; sale was not created.');
       }
       
       setNewSale({ ref_num: '', date: new Date().toISOString().split('T')[0], amount: '', description: '', payment_method: 'cash' });
@@ -157,7 +168,7 @@ export default function SalesPage() {
         
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button>Record New Sale</Button>
+            <Button disabled={!currentStore}>Record New Sale</Button>
           </DialogTrigger>
           <DialogContent className="max-w-[95vw] sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
@@ -221,13 +232,14 @@ export default function SalesPage() {
                 <Label htmlFor="payment">
                   Payment Method
                 </Label>
-                <Select value={newSale.payment_method} onValueChange={(value) => setNewSale({...newSale, payment_method: value as 'cash' | 'card' | 'transfer'})}>
+                <Select value={newSale.payment_method} onValueChange={(value) => setNewSale({...newSale, payment_method: value as 'cash' | 'card' | 'transfer' | 'check'})}>
                   <SelectTrigger className="sm:col-span-3">
                     <SelectValue placeholder="Select payment method" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="cash">Cash</SelectItem>
                     <SelectItem value="card">Card</SelectItem>
+                    <SelectItem value="check">Check</SelectItem>
                     <SelectItem value="transfer">Bank Transfer</SelectItem>
                   </SelectContent>
                 </Select>
@@ -311,7 +323,7 @@ export default function SalesPage() {
               <Label htmlFor="edit-payment">Payment Method</Label>
               <Select
                 value={editingSale?.payment_method || ''}
-                onValueChange={(value) => setEditingSale(editingSale ? { ...editingSale, payment_method: value as 'cash' | 'card' | 'transfer' } : null)}
+                onValueChange={(value) => setEditingSale(editingSale ? { ...editingSale, payment_method: value as 'cash' | 'card' | 'transfer' | 'check' } : null)}
               >
                 <SelectTrigger className="col-span-3">
                   <SelectValue />
@@ -319,6 +331,7 @@ export default function SalesPage() {
                 <SelectContent>
                   <SelectItem value="cash">Cash</SelectItem>
                   <SelectItem value="card">Card</SelectItem>
+                  <SelectItem value="check">Check</SelectItem>
                   <SelectItem value="transfer">Bank Transfer</SelectItem>
                 </SelectContent>
               </Select>
@@ -331,20 +344,32 @@ export default function SalesPage() {
         </DialogContent>
       </Dialog>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Sales Summary</CardTitle>
-          <CardDescription>Total sales for the current period</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="text-3xl font-bold text-green-600">
-            {totalSales.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </div>
-          <p className="text-sm text-gray-600 mt-2">
-            {sales.length} transactions recorded
-          </p>
-        </CardContent>
-      </Card>
+      {!currentStore && (
+        <Card className="border-yellow-200 bg-yellow-50">
+          <CardContent className="pt-6">
+            <p className="text-center text-yellow-800">
+              Please select a store from the sidebar to view and manage sales.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {currentStore && (
+        <>
+          <Card>
+            <CardHeader>
+              <CardTitle>Sales Summary</CardTitle>
+              <CardDescription>Total sales for the current period</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-green-600">
+                {totalSales.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <p className="text-sm text-gray-600 mt-2">
+                {sales.length} transactions recorded
+              </p>
+            </CardContent>
+          </Card>
 
       <Card>
         <CardHeader>
@@ -391,7 +416,12 @@ export default function SalesPage() {
                   <TableCell>{sale.description}</TableCell>
                   <TableCell>{sale.store_name || 'N/A'}</TableCell>
                   <TableCell>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${sale.payment_method === 'cash' ? 'bg-green-100 text-green-800' : sale.payment_method === 'card' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'}`}>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      sale.payment_method === 'cash' ? 'bg-green-100 text-green-800' : 
+                      sale.payment_method === 'card' ? 'bg-blue-100 text-blue-800' : 
+                      sale.payment_method === 'check' ? 'bg-orange-100 text-orange-800' : 
+                      'bg-purple-100 text-purple-800'
+                    }`}>
                       {sale.payment_method.toUpperCase()}
                     </span>
                   </TableCell>
@@ -445,6 +475,8 @@ export default function SalesPage() {
           </div>
         </CardContent>
       </Card>
+        </>
+      )}
     </div>
   );
 }

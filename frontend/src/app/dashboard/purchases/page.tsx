@@ -39,7 +39,7 @@ export default function PurchasesPage() {
     amount: '', 
     description: '', 
     supplier: '',
-    payment_method: 'cash' as 'cash' | 'card' | 'check',
+    payment_method: 'cash' as 'cash' | 'card' | 'check' | 'transfer',
     category: '',
     otherCategory: ''
   });
@@ -300,7 +300,7 @@ export default function PurchasesPage() {
                 <Label htmlFor="payment">
                   Payment Method
                 </Label>
-                <Select value={newPurchase.payment_method} onValueChange={(value) => setNewPurchase({...newPurchase, payment_method: value as 'cash' | 'card' | 'check'})}>
+                <Select value={newPurchase.payment_method} onValueChange={(value) => setNewPurchase({...newPurchase, payment_method: value as 'cash' | 'card' | 'check' | 'transfer'})}>
                   <SelectTrigger className="col-span-3">
                     <SelectValue placeholder="Select payment method" />
                   </SelectTrigger>
@@ -308,6 +308,7 @@ export default function PurchasesPage() {
                     <SelectItem value="cash">Cash</SelectItem>
                     <SelectItem value="card">Card</SelectItem>
                     <SelectItem value="check">Check</SelectItem>
+                    <SelectItem value="transfer">Bank Transfer</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -394,7 +395,7 @@ export default function PurchasesPage() {
                 <Label htmlFor="edit-payment">Payment Method</Label>
                 <Select
                   value={editingPurchase.payment_method}
-                  onValueChange={(value) => setEditingPurchase({ ...editingPurchase, payment_method: value as 'cash' | 'card' | 'check' })}
+                  onValueChange={(value) => setEditingPurchase({ ...editingPurchase, payment_method: value as 'cash' | 'card' | 'check' | 'transfer' })}
                 >
                   <SelectTrigger className="col-span-3">
                     <SelectValue />
@@ -403,6 +404,7 @@ export default function PurchasesPage() {
                     <SelectItem value="cash">Cash</SelectItem>
                     <SelectItem value="card">Card</SelectItem>
                     <SelectItem value="check">Check</SelectItem>
+                    <SelectItem value="transfer">Bank Transfer</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -489,6 +491,8 @@ export default function PurchasesPage() {
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                       purchase.payment_method === 'cash' ? 'bg-green-100 text-green-800' :
                       purchase.payment_method === 'card' ? 'bg-blue-100 text-blue-800' :
+                      purchase.payment_method === 'check' ? 'bg-orange-100 text-orange-800' :
+                      purchase.payment_method === 'transfer' ? 'bg-purple-100 text-purple-800' :
                       'bg-yellow-100 text-yellow-800'
                     }`}>
                       {purchase.payment_method.toUpperCase()}
@@ -555,7 +559,7 @@ export default function PurchasesPage() {
                               <Label>Payment Method</Label>
                               <Select 
                                 value={editingPurchase.payment_method} 
-                                onValueChange={(value) => setEditingPurchase({ ...editingPurchase, payment_method: value as 'cash' | 'card' | 'check' })}
+                                onValueChange={(value) => setEditingPurchase({ ...editingPurchase, payment_method: value as 'cash' | 'card' | 'check' | 'transfer' })}
                               >
                                 <SelectTrigger className="col-span-3">
                                   <SelectValue />
@@ -564,6 +568,7 @@ export default function PurchasesPage() {
                                   <SelectItem value="cash">Cash</SelectItem>
                                   <SelectItem value="card">Card</SelectItem>
                                   <SelectItem value="check">Check</SelectItem>
+                                  <SelectItem value="transfer">Bank Transfer</SelectItem>
                                 </SelectContent>
                               </Select>
                             </div>

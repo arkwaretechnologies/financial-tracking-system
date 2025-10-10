@@ -25,7 +25,7 @@ export default function ExpensesPage() {
     amount: '', 
     description: '', 
     paid_to: '',
-    payment_method: 'cash' as 'cash' | 'card' | 'check',
+    payment_method: 'cash' as 'cash' | 'card' | 'check' | 'transfer',
   });
   const [expenseDocument, setExpenseDocument] = useState<File | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -243,7 +243,7 @@ export default function ExpensesPage() {
                 <Label htmlFor="payment">
                   Payment Method
                 </Label>
-                <Select value={newExpense.payment_method} onValueChange={(value) => setNewExpense({...newExpense, payment_method: value as 'cash' | 'card' | 'check'})}>
+                <Select value={newExpense.payment_method} onValueChange={(value) => setNewExpense({...newExpense, payment_method: value as 'cash' | 'card' | 'check' | 'transfer'})}>
                   <SelectTrigger className="col-span-3">
                     <SelectValue placeholder="Select payment method" />
                   </SelectTrigger>
@@ -251,6 +251,7 @@ export default function ExpensesPage() {
                     <SelectItem value="cash">Cash</SelectItem>
                     <SelectItem value="card">Card</SelectItem>
                     <SelectItem value="check">Check</SelectItem>
+                    <SelectItem value="transfer">Bank Transfer</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -343,7 +344,17 @@ export default function ExpensesPage() {
                   <TableCell>{expense.description}</TableCell>
                   <TableCell>{expense.paid_to}</TableCell>
                   <TableCell>{expense.store_name}</TableCell>
-                  <TableCell>{expense.payment_method}</TableCell>
+                  <TableCell>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      expense.payment_method === 'cash' ? 'bg-green-100 text-green-800' :
+                      expense.payment_method === 'card' ? 'bg-blue-100 text-blue-800' :
+                      expense.payment_method === 'check' ? 'bg-orange-100 text-orange-800' :
+                      expense.payment_method === 'transfer' ? 'bg-purple-100 text-purple-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {expense.payment_method.toUpperCase()}
+                    </span>
+                  </TableCell>
                   <TableCell className="text-right">{new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(expense.amount)}</TableCell>
                   <TableCell>
                     {expense.supp_doc_url && 
@@ -389,7 +400,7 @@ export default function ExpensesPage() {
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="edit-payment">Payment Method</Label>
-                <Select value={editingExpense?.payment_method} onValueChange={(value) => setEditingExpense(editingExpense ? { ...editingExpense, payment_method: value as 'cash' | 'card' | 'check' } : null)}>
+                <Select value={editingExpense?.payment_method} onValueChange={(value) => setEditingExpense(editingExpense ? { ...editingExpense, payment_method: value as 'cash' | 'card' | 'check' | 'transfer' } : null)}>
                   <SelectTrigger className="col-span-3">
                     <SelectValue placeholder="Select payment method" />
                   </SelectTrigger>
@@ -397,6 +408,7 @@ export default function ExpensesPage() {
                     <SelectItem value="cash">Cash</SelectItem>
                     <SelectItem value="card">Card</SelectItem>
                     <SelectItem value="check">Check</SelectItem>
+                    <SelectItem value="transfer">Bank Transfer</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
