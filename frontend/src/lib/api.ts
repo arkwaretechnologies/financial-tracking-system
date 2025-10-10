@@ -135,7 +135,7 @@ export interface Expense {
   description: string;
   paid_to: string;
   store_name: string;
-  payment_method: 'cash' | 'card' | 'check';
+  payment_method: 'cash' | 'card' | 'check' | 'transfer';
   supp_doc_url?: string;
 }
 
