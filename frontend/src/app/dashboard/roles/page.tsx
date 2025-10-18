@@ -63,7 +63,7 @@ export default function RolesPage() {
   // Form states
   const [newRole, setNewRole] = useState({
     name: '',
-    roleType: 'client_role',
+    roleType: 'viewer',
     description: ''
   });
   const [editRoleData, setEditRoleData] = useState({
@@ -116,7 +116,7 @@ export default function RolesPage() {
       const response = await api.getRoleAccess(token, roleId);
       const accessMap: Record<string, PageAccess> = {};
       
-      response.access.forEach((item: { page_id: string; pages: { page_key: string } }) => {
+      response.access.forEach((item) => {
         accessMap[item.pages.page_key] = {
           pageId: item.page_id,
           accessLevel: item.access_level,
@@ -163,7 +163,7 @@ export default function RolesPage() {
         description: 'Role created successfully'
       });
 
-      setNewRole({ name: '', roleType: 'client_role', description: '' });
+      setNewRole({ name: '', roleType: 'viewer', description: '' });
       setIsAddRoleDialogOpen(false);
       fetchRoles();
     } catch (error: unknown) {
@@ -295,7 +295,7 @@ export default function RolesPage() {
     });
   };
 
-  const updateAccessPermission = (pageKey: string, field: keyof PageAccess, value: boolean) => {
+  const updateAccessPermission = (pageKey: string, field: keyof PageAccess, value: boolean | string) => {
     setRoleAccess(prev => ({
       ...prev,
       [pageKey]: {
@@ -303,6 +303,18 @@ export default function RolesPage() {
         [field]: value
       }
     }));
+  };
+
+  const formatRoleType = (roleType: string): string => {
+    const typeMap: Record<string, string> = {
+      'super_admin': 'Super Admin',
+      'client_admin': 'Client Admin',
+      'store_manager': 'Store Manager',
+      'accountant': 'Accountant',
+      'cashier': 'Cashier',
+      'viewer': 'Viewer'
+    };
+    return typeMap[roleType] || roleType;
   };
 
   if (user?.role !== 'admin' && user?.role !== 'super_admin') {
@@ -397,8 +409,8 @@ export default function RolesPage() {
                 <TableRow key={role.id}>
                   <TableCell className="font-medium">{role.name}</TableCell>
                   <TableCell>
-                    <Badge variant={role.role_type === 'system_role' ? 'default' : 'secondary'}>
-                      {role.role_type}
+                    <Badge variant={role.role_type === 'super_admin' || role.role_type === 'client_admin' ? 'default' : 'secondary'}>
+                      {formatRoleType(role.role_type)}
                     </Badge>
                   </TableCell>
                   <TableCell>{role.description || '-'}</TableCell>
@@ -473,8 +485,12 @@ export default function RolesPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="system_role">System Role</SelectItem>
-                  <SelectItem value="client_role">Client Role</SelectItem>
+                  <SelectItem value="super_admin">Super Admin</SelectItem>
+                  <SelectItem value="client_admin">Client Admin</SelectItem>
+                  <SelectItem value="store_manager">Store Manager</SelectItem>
+                  <SelectItem value="accountant">Accountant</SelectItem>
+                  <SelectItem value="cashier">Cashier</SelectItem>
+                  <SelectItem value="viewer">Viewer</SelectItem>
                 </SelectContent>
               </Select>
             </div>

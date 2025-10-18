@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { supabase } from '../config/supabase';
 import bcrypt from 'bcryptjs';
+import { CreateUserRequest, UpdateUserRequest } from '../types';
 
 export const getAllUsers = async (req: Request, res: Response) => {
   try {
@@ -58,8 +59,9 @@ export const getUsersByClient = async (req: Request, res: Response) => {
   }
 };
 
-export const createUser = async (req: Request, res: Response) => {
+export const createUser = async (req: Request<{}, {}, CreateUserRequest>, res: Response) => {
   try {
+    console.log('Create user request body:', req.body);
     const { username, email, password, role, client_id, store_id, first_name, last_name, phone_no } = req.body;
     const user: any = (req as any).user;
 
@@ -78,19 +80,55 @@ export const createUser = async (req: Request, res: Response) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // Find the system role by name
+    console.log('Looking for role:', role);
+    const { data: systemRole, error: roleError } = await supabase
+      .from('system_roles')
+      .select('id, role_type')
+      .eq('name', role)
+      .eq('is_active', true)
+      .single();
+
+    console.log('Role lookup result:', { systemRole, roleError });
+
+    if (roleError || !systemRole) {
+      console.log('Role not found error:', roleError);
+      return res.status(400).json({ error: `Role '${role}' not found` });
+    }
+
+    // Map system_role_type to user_role enum
+    const mapRoleTypeToUserRole = (roleType: string): string => {
+      if (roleType === 'super_admin') return 'super_admin';
+      if (roleType === 'client_admin') return 'admin';
+      return 'client_user'; // store_manager, accountant, cashier, viewer
+    };
+
+    // Prepare user data with system role fields (if available)
+    const userData: any = {
+      username,
+      email,
+      password: hashedPassword,
+      role: mapRoleTypeToUserRole(systemRole.role_type), // Map role_type to user_role enum
+      client_id,
+      store_id: store_id || null,
+      first_name: first_name || null,
+      last_name: last_name || null,
+      phone: phone_no || null
+    };
+
+    // Try to add system role fields (if columns exist)
+    try {
+      userData.system_role_id = systemRole.id;
+      userData.role_type = systemRole.role_type;
+      userData.role_assigned_at = new Date().toISOString();
+      userData.role_assigned_by = user.id;
+    } catch (error) {
+      console.log('System role columns not available, using legacy role assignment');
+    }
+
     const { data: newUser, error } = await supabase
       .from('users')
-      .insert([{
-        username,
-        email,
-        password: hashedPassword,
-        role,
-        client_id,
-        store_id: store_id || null,
-        first_name: first_name || null,
-        last_name: last_name || null,
-        phone: phone_no || null
-      }])
+      .insert([userData])
       .select('id, username, email, role, client_id, store_id, first_name, last_name, phone, created_at')
       .single();
 
@@ -102,13 +140,18 @@ export const createUser = async (req: Request, res: Response) => {
     }
 
     res.status(201).json({ user: newUser, message: 'User created successfully' });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Create user error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      code: error.code
+    });
+    res.status(500).json({ error: 'Internal server error', details: error.message });
   }
 };
 
-export const updateUser = async (req: Request, res: Response) => {
+export const updateUser = async (req: Request<{ userId: string }, {}, UpdateUserRequest>, res: Response) => {
   try {
     const { userId } = req.params;
     const { username, email, password, role, store_id, first_name, last_name, phone_no } = req.body;
@@ -133,7 +176,6 @@ export const updateUser = async (req: Request, res: Response) => {
     const updateData: any = {};
     if (username) updateData.username = username;
     if (email) updateData.email = email;
-    if (role) updateData.role = role;
     if (store_id !== undefined) updateData.store_id = store_id || null;
     if (first_name !== undefined) updateData.first_name = first_name || null;
     if (last_name !== undefined) updateData.last_name = last_name || null;
@@ -142,6 +184,41 @@ export const updateUser = async (req: Request, res: Response) => {
     // Hash password if provided
     if (password) {
       updateData.password = await bcrypt.hash(password, 10);
+    }
+
+    // Handle role assignment using system roles
+    if (role) {
+      // Find the system role by name
+      const { data: systemRole, error: roleError } = await supabase
+        .from('system_roles')
+        .select('id, role_type')
+        .eq('name', role)
+        .eq('is_active', true)
+        .single();
+
+      if (roleError || !systemRole) {
+        return res.status(400).json({ error: `Role '${role}' not found` });
+      }
+
+      // Map system_role_type to user_role enum
+      const mapRoleTypeToUserRole = (roleType: string): string => {
+        if (roleType === 'super_admin') return 'super_admin';
+        if (roleType === 'client_admin') return 'admin';
+        return 'client_user'; // store_manager, accountant, cashier, viewer
+      };
+
+      // Try to update with new system role information (if columns exist)
+      try {
+        updateData.system_role_id = systemRole.id;
+        updateData.role_type = systemRole.role_type;
+        updateData.role_assigned_at = new Date().toISOString();
+        updateData.role_assigned_by = user.id;
+      } catch (error) {
+        console.log('System role columns not available, using legacy role assignment');
+      }
+      
+      // Map role_type to user_role enum for backward compatibility
+      updateData.role = mapRoleTypeToUserRole(systemRole.role_type);
     }
 
     const { data: updatedUser, error } = await supabase
@@ -159,9 +236,14 @@ export const updateUser = async (req: Request, res: Response) => {
     }
 
     res.json({ user: updatedUser, message: 'User updated successfully' });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Update user error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      code: error.code
+    });
+    res.status(500).json({ error: 'Internal server error', details: error.message });
   }
 };
 

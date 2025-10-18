@@ -38,8 +38,9 @@ interface Store {
 interface SystemRole {
   id: string;
   name: string;
+  role_type: string;
   description?: string;
-  client_id: string;
+  is_active: boolean;
   created_at: string;
 }
 
@@ -82,6 +83,8 @@ export default function ClientUsersPage() {
     if (user?.client_id && token) {
       fetchUsers();
       fetchStores();
+    }
+    if (token) {
       fetchSystemRoles();
     }
   }, [user?.client_id, token]);
@@ -124,13 +127,19 @@ export default function ClientUsersPage() {
   };
 
   const fetchSystemRoles = async () => {
-    if (!token || !user?.client_id) return;
+    if (!token) return;
     
     try {
-      const response = await api.getSystemRolesByClient(token, user.client_id);
+      const response = await api.getRoles(token);
+      console.log('Fetched roles:', response.roles); // Debug log
       setSystemRoles(response.roles);
     } catch (error) {
       console.error('Error fetching system roles:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch roles',
+        variant: 'destructive'
+      });
     }
   };
 
@@ -369,11 +378,15 @@ export default function ClientUsersPage() {
                      <SelectValue placeholder="Select a role" />
                   </SelectTrigger>
                   <SelectContent>
-                     {systemRoles.map((role) => (
-                       <SelectItem key={role.id} value={role.name}>
-                         {role.name}
-                       </SelectItem>
-                     ))}
+                     {systemRoles.length === 0 ? (
+                       <SelectItem value="" disabled>No roles available</SelectItem>
+                     ) : (
+                       systemRoles.map((role) => (
+                         <SelectItem key={role.id} value={role.name}>
+                           {role.name}
+                         </SelectItem>
+                       ))
+                     )}
                   </SelectContent>
                 </Select>
               </div>
@@ -610,11 +623,15 @@ export default function ClientUsersPage() {
                      <SelectValue placeholder="Select a role" />
                    </SelectTrigger>
                    <SelectContent>
-                     {systemRoles.map((role) => (
-                       <SelectItem key={role.id} value={role.name}>
-                         {role.name}
-                       </SelectItem>
-                     ))}
+                     {systemRoles.length === 0 ? (
+                       <SelectItem value="" disabled>No roles available</SelectItem>
+                     ) : (
+                       systemRoles.map((role) => (
+                         <SelectItem key={role.id} value={role.name}>
+                           {role.name}
+                         </SelectItem>
+                       ))
+                     )}
                    </SelectContent>
                  </Select>
                </div>

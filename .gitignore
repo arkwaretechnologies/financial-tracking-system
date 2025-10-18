@@ -11,6 +11,7 @@ node_modules/
 
 # Schemas
 schemas/
+backend/schemas/
 
 # Next.js
 .next/

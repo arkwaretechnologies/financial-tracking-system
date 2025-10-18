@@ -1,3 +1,5 @@
+import { Request } from 'express';
+
 export interface User {
   id: string;
   username: string;
@@ -46,8 +48,23 @@ export interface CreateUserRequest {
   username: string;
   email: string;
   password: string;
-  role: 'admin' | 'client_user';
+  role: string;
   client_id: string;
+  store_id?: string;
+  first_name?: string;
+  last_name?: string;
+  phone_no?: string;
+}
+
+export interface UpdateUserRequest {
+  username?: string;
+  email?: string;
+  password?: string;
+  role?: string;
+  store_id?: string;
+  first_name?: string;
+  last_name?: string;
+  phone_no?: string;
 }
 
 export interface CreateTransactionRequest {

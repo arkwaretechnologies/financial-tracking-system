@@ -41,18 +41,29 @@ router.get('/access-matrix', async (req, res) => {
         pages!inner(page_key, page_name, page_group, route_path, icon_name)
       `)
       .eq('system_roles.is_active', true)
-      .eq('pages.is_active', true)
-      .order('system_roles(name)')
-      .order('pages(page_group)')
-      .order('pages(sort_order)');
+      .eq('pages.is_active', true);
 
     if (error) {
       console.error('Error fetching access matrix:', error);
       return (res as any).status(500).json({ error: 'Failed to fetch access matrix' });
     }
 
+    // Sort the results in JavaScript
+    const sortedMatrix = matrix?.sort((a: any, b: any) => {
+      // First sort by role name
+      const roleCompare = (a.system_roles?.name || '').localeCompare(b.system_roles?.name || '');
+      if (roleCompare !== 0) return roleCompare;
+      // Then by page group
+      const groupCompare = (a.pages?.page_group || '').localeCompare(b.pages?.page_group || '');
+      if (groupCompare !== 0) return groupCompare;
+      // Finally by page name
+      const nameA = a.pages?.page_name || '';
+      const nameB = b.pages?.page_name || '';
+      return nameA.localeCompare(nameB);
+    }) || [];
+
     // Transform data into a structured format
-    const accessMatrix = matrix.reduce((acc: any, item: any) => {
+    const accessMatrix = sortedMatrix.reduce((acc: any, item: any) => {
       const roleName = item.system_roles.name;
       if (!acc[roleName]) {
         acc[roleName] = {
@@ -94,18 +105,24 @@ router.get('/pages', async (req, res) => {
     const { data: pages, error } = await supabase
       .from('pages')
       .select('*')
-      .eq('is_active', true)
-      .order('page_group')
-      .order('sort_order')
-      .order('page_name');
+      .eq('is_active', true);
 
     if (error) {
       console.error('Error fetching pages:', error);
       return (res as any).status(500).json({ error: 'Failed to fetch pages' });
     }
 
+    // Sort pages in JavaScript
+    const sortedPages = pages?.sort((a: any, b: any) => {
+      // First by page_group
+      const groupCompare = (a.page_group || '').localeCompare(b.page_group || '');
+      if (groupCompare !== 0) return groupCompare;
+      // Then by page_name
+      return (a.page_name || '').localeCompare(b.page_name || '');
+    }) || [];
+
     // Group pages by group
-    const groupedPages = pages.reduce((acc: any, page: any) => {
+    const groupedPages = sortedPages.reduce((acc: any, page: any) => {
       if (!acc[page.page_group]) {
         acc[page.page_group] = [];
       }
@@ -113,7 +130,7 @@ router.get('/pages', async (req, res) => {
       return acc;
     }, {});
 
-    (res as any).json({ pages, groupedPages });
+    (res as any).json({ pages: sortedPages, groupedPages });
   } catch (error) {
     console.error('Error in GET /api/roles/pages:', error);
     (res as any).status(500).json({ error: 'Internal server error' });
@@ -132,16 +149,27 @@ router.get('/:roleId/access', async (req, res) => {
         pages!inner(page_key, page_name, page_group, route_path)
       `)
       .eq('role_id', roleId)
-      .eq('pages.is_active', true)
-      .order('pages(page_group)')
-      .order('pages(sort_order)');
+      .eq('pages.is_active', true);
 
     if (error) {
       console.error('Error fetching role access:', error);
       return (res as any).status(500).json({ error: 'Failed to fetch role access' });
     }
 
-    (res as any).json({ access });
+    // Sort the results in JavaScript instead of in the query
+    const sortedAccess = access?.sort((a: any, b: any) => {
+      // First sort by page_group
+      const groupA = a.pages?.page_group || '';
+      const groupB = b.pages?.page_group || '';
+      if (groupA < groupB) return -1;
+      if (groupA > groupB) return 1;
+      // Then by page_name (since sort_order might not exist in DB yet)
+      const nameA = a.pages?.page_name || '';
+      const nameB = b.pages?.page_name || '';
+      return nameA.localeCompare(nameB);
+    });
+
+    (res as any).json({ access: sortedAccess || [] });
   } catch (error) {
     console.error('Error in GET /api/roles/:roleId/access:', error);
     (res as any).status(500).json({ error: 'Internal server error' });

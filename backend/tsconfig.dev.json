@@ -5,8 +5,7 @@
     "files": true,
     "compilerOptions": {
       "module": "commonjs",
-      "skipLibCheck": true,
-      "types": ["node"]
+      "skipLibCheck": true
     }
   }
 }

@@ -22,7 +22,7 @@ interface User {
   id: string;
   username: string;
   email?: string;
-  role: 'admin' | 'client_user';
+  role: 'super_admin' | 'admin' | 'client_user';
   client_id: string;
   first_name?: string;
   last_name?: string;
@@ -148,7 +148,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const clientStores = storesResponse.stores;
 
       // Map backend role to frontend role with fallback
-      const userRole = response.user.role === 'admin' ? 'admin' : 'client_user';
+      const userRole = 
+        response.user.role === 'super_admin' ? 'super_admin' :
+        response.user.role === 'admin' ? 'admin' : 'client_user';
       
       const userData: User = {
         id: response.user.id,

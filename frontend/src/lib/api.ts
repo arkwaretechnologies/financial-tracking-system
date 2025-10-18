@@ -13,7 +13,7 @@ interface LoginResponse {
     id: string;
     username: string;
     email: string;
-    role: 'admin' | 'client_user';
+    role: 'super_admin' | 'admin' | 'client_user';
     client_id: string;
     first_name?: string;
     last_name?: string;
@@ -176,6 +176,54 @@ interface Store {
   name: string;
   client_id: string;
   created_at: string;
+}
+
+interface Role {
+  id: string;
+  name: string;
+  role_type: string;
+  description?: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+interface Page {
+  id: string;
+  page_key: string;
+  page_name: string;
+  page_group: string;
+  route_path: string;
+  icon_name?: string;
+  sort_order: number;
+}
+
+interface PageAccessResponse {
+  page_id: string;
+  access_level: string;
+  can_create: boolean;
+  can_read: boolean;
+  can_update: boolean;
+  can_delete: boolean;
+  can_export: boolean;
+  can_import: boolean;
+  pages: {
+    page_key: string;
+  };
+}
+
+interface PageAccessRequest {
+  pageId: string;
+  accessLevel: string;
+  canCreate: boolean;
+  canRead: boolean;
+  canUpdate: boolean;
+  canDelete: boolean;
+  canExport: boolean;
+  canImport: boolean;
+}
+
+interface GroupedPages {
+  [group: string]: Page[];
 }
 
 
@@ -440,35 +488,35 @@ class ApiClient {
   }
 
   // Role Management APIs
-  async getRoles(token: string): Promise<{ roles: unknown[] }> {
+  async getRoles(token: string): Promise<{ roles: Role[] }> {
     return this.get('/roles', token);
   }
 
-  async getPages(token: string): Promise<{ pages: unknown[]; groupedPages: unknown }> {
+  async getPages(token: string): Promise<{ pages: Page[]; groupedPages: GroupedPages }> {
     return this.get('/roles/pages', token);
   }
 
-  async getRoleAccess(token: string, roleId: string): Promise<{ access: unknown[] }> {
+  async getRoleAccess(token: string, roleId: string): Promise<{ access: PageAccessResponse[] }> {
     return this.get(`/roles/${roleId}/access`, token);
   }
 
-  async createRole(token: string, roleData: { name: string; roleType: string; description?: string }): Promise<{ role: unknown }> {
+  async createRole(token: string, roleData: { name: string; roleType: string; description?: string }): Promise<{ role: Role }> {
     return this.post('/roles', roleData, token);
   }
 
-  async updateRole(token: string, roleId: string, roleData: { name?: string; description?: string; isActive?: boolean }): Promise<{ role: unknown }> {
+  async updateRole(token: string, roleId: string, roleData: { name?: string; description?: string; isActive?: boolean }): Promise<{ role: Role }> {
     return this.put(`/roles/${roleId}`, roleData, token);
   }
 
-  async updateRoleAccess(token: string, roleId: string, pageAccess: unknown[]): Promise<{ access: unknown[] }> {
+  async updateRoleAccess(token: string, roleId: string, pageAccess: PageAccessRequest[]): Promise<{ access: PageAccessResponse[] }> {
     return this.post(`/roles/${roleId}/access`, { pageAccess }, token);
   }
 
-  async deleteRole(token: string, roleId: string): Promise<{ message: string; role: unknown }> {
+  async deleteRole(token: string, roleId: string): Promise<{ message: string; role: Role }> {
     return this.delete(`/roles/${roleId}`, token);
   }
 
-  async getAccessMatrix(token: string): Promise<{ accessMatrix: unknown }> {
+  async getAccessMatrix(token: string): Promise<{ accessMatrix: any }> {
     return this.get('/roles/access-matrix', token);
   }
 }
