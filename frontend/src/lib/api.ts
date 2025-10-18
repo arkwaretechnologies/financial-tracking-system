@@ -440,35 +440,35 @@ class ApiClient {
   }
 
   // Role Management APIs
-  async getRoles(token: string): Promise<{ roles: any[] }> {
+  async getRoles(token: string): Promise<{ roles: unknown[] }> {
     return this.get('/roles', token);
   }
 
-  async getPages(token: string): Promise<{ pages: any[]; groupedPages: any }> {
+  async getPages(token: string): Promise<{ pages: unknown[]; groupedPages: unknown }> {
     return this.get('/roles/pages', token);
   }
 
-  async getRoleAccess(token: string, roleId: string): Promise<{ access: any[] }> {
+  async getRoleAccess(token: string, roleId: string): Promise<{ access: unknown[] }> {
     return this.get(`/roles/${roleId}/access`, token);
   }
 
-  async createRole(token: string, roleData: { name: string; roleType: string; description?: string }): Promise<{ role: any }> {
+  async createRole(token: string, roleData: { name: string; roleType: string; description?: string }): Promise<{ role: unknown }> {
     return this.post('/roles', roleData, token);
   }
 
-  async updateRole(token: string, roleId: string, roleData: { name?: string; description?: string; isActive?: boolean }): Promise<{ role: any }> {
+  async updateRole(token: string, roleId: string, roleData: { name?: string; description?: string; isActive?: boolean }): Promise<{ role: unknown }> {
     return this.put(`/roles/${roleId}`, roleData, token);
   }
 
-  async updateRoleAccess(token: string, roleId: string, pageAccess: any[]): Promise<{ access: any[] }> {
+  async updateRoleAccess(token: string, roleId: string, pageAccess: unknown[]): Promise<{ access: unknown[] }> {
     return this.post(`/roles/${roleId}/access`, { pageAccess }, token);
   }
 
-  async deleteRole(token: string, roleId: string): Promise<{ message: string; role: any }> {
+  async deleteRole(token: string, roleId: string): Promise<{ message: string; role: unknown }> {
     return this.delete(`/roles/${roleId}`, token);
   }
 
-  async getAccessMatrix(token: string): Promise<{ accessMatrix: any }> {
+  async getAccessMatrix(token: string): Promise<{ accessMatrix: unknown }> {
     return this.get('/roles/access-matrix', token);
   }
 }
