@@ -97,7 +97,7 @@ export default function ClientUsersPage() {
       const response = await api.getUsersByClient(token, user.client_id);
       
       // Transform the response to match our interface
-      const transformedUsers = response.users.map((user: any) => ({
+      const transformedUsers = response.users.map((user: ClientUser) => ({
         ...user,
         status: 'active' // Default status
       }));
@@ -175,11 +175,11 @@ export default function ClientUsersPage() {
       setNewUser({ username: '', email: '', password: '', first_name: '', last_name: '', phone: '', role: '', store_id: '' });
       setIsAddDialogOpen(false);
       fetchUsers();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error creating user:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to create user',
+        description: error instanceof Error ? error.message : 'Failed to create user',
         variant: 'destructive'
       });
     }
@@ -208,11 +208,11 @@ export default function ClientUsersPage() {
     setEditingUser(null);
     setIsEditDialogOpen(false);
       fetchUsers();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error updating user:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to update user',
+        description: error instanceof Error ? error.message : 'Failed to update user',
         variant: 'destructive'
       });
     }
@@ -228,11 +228,11 @@ export default function ClientUsersPage() {
         description: 'User deleted successfully'
       });
       fetchUsers();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error deleting user:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to delete user',
+        description: error instanceof Error ? error.message : 'Failed to delete user',
         variant: 'destructive'
       });
     }
@@ -265,11 +265,11 @@ export default function ClientUsersPage() {
       setNewPassword('');
       setConfirmPassword('');
       setIsPasswordDialogOpen(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error resetting password:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to reset password',
+        description: error instanceof Error ? error.message : 'Failed to reset password',
         variant: 'destructive'
       });
     }

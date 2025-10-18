@@ -7,7 +7,6 @@ import {
   BarChart3, 
   ShoppingBag, 
   Users, 
-  Settings, 
   Building,
   LogOut,
   Menu,
