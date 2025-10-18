@@ -226,6 +226,16 @@ interface GroupedPages {
   [group: string]: Page[];
 }
 
+interface AccessMatrix {
+  roles: Role[];
+  pages: Page[];
+  accessMatrix: {
+    [roleId: string]: {
+      [pageId: string]: PageAccessResponse;
+    };
+  };
+}
+
 
 class ApiClient {
   private baseUrl: string;
@@ -516,7 +526,7 @@ class ApiClient {
     return this.delete(`/roles/${roleId}`, token);
   }
 
-  async getAccessMatrix(token: string): Promise<{ accessMatrix: any }> {
+  async getAccessMatrix(token: string): Promise<AccessMatrix> {
     return this.get('/roles/access-matrix', token);
   }
 }
