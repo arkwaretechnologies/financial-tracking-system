@@ -9,7 +9,11 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY || '';
 let supabaseClient: any = null;
 
 if (!supabaseUrl || !supabaseServiceKey) {
-  console.warn('Missing Supabase environment variables. Using mock client for development.');
+  console.error('❌ Missing Supabase environment variables!');
+  console.error('SUPABASE_URL:', supabaseUrl ? 'SET' : 'MISSING');
+  console.error('SUPABASE_SERVICE_KEY:', supabaseServiceKey ? 'SET' : 'MISSING');
+  console.warn('Using mock client for development - this will return empty data!');
+  
   // Create a mock client for development/testing
   supabaseClient = {
     from: () => ({
@@ -28,6 +32,8 @@ if (!supabaseUrl || !supabaseServiceKey) {
     }
   };
 } else {
+  console.log('✅ Supabase client initialized successfully');
+  console.log('Supabase URL:', supabaseUrl.substring(0, 30) + '...');
   supabaseClient = createClient(supabaseUrl, supabaseServiceKey);
 }
 

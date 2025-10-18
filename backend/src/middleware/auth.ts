@@ -11,11 +11,12 @@ export const authenticateToken = async (req: Request, res: Response, next: NextF
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
-    return res.status(401).json({ error: 'Access token required' });
+    return (res as any).status(401).json({ error: 'Access token required' });
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
+    const jwtSecret = process.env.JWT_SECRET || 'fallback-secret';
+    const decoded = jwt.verify(token, jwtSecret) as any;
     
     // Debug logging
     console.log('Token decoded:', JSON.stringify(decoded, null, 2));
@@ -25,7 +26,7 @@ export const authenticateToken = async (req: Request, res: Response, next: NextF
     
     if (!userId) {
       console.error('No user ID found in token payload');
-      return res.status(401).json({ error: 'Invalid token - no user ID' });
+      return (res as any).status(401).json({ error: 'Invalid token - no user ID' });
     }
     
     // Verify user still exists and is active
@@ -37,14 +38,20 @@ export const authenticateToken = async (req: Request, res: Response, next: NextF
 
     if (error || !user) {
       console.error('User not found or error:', error);
-      return res.status(401).json({ error: 'Invalid token' });
+      return (res as any).status(401).json({ error: 'Invalid token - user not found' });
     }
 
     (req as AuthRequest).user = user;
     next();
-  } catch (error) {
-    console.error('Token verification error:', error);
-    return res.status(403).json({ error: 'Invalid token' });
+  } catch (error: any) {
+    console.error('Token verification error:', error.message);
+    if (error.name === 'TokenExpiredError') {
+      return (res as any).status(401).json({ error: 'Token expired', code: 'TOKEN_EXPIRED' });
+    }
+    if (error.name === 'JsonWebTokenError') {
+      return (res as any).status(401).json({ error: 'Invalid token', code: 'INVALID_TOKEN' });
+    }
+    return (res as any).status(403).json({ error: 'Token verification failed' });
   }
 };
 
@@ -52,11 +59,11 @@ export const requireRole = (roles: string[]) => {
   return (req: Request, res: Response, next: NextFunction) => {
     const authReq = req as AuthRequest;
     if (!authReq.user) {
-      return res.status(401).json({ error: 'Authentication required' });
+      return (res as any).status(401).json({ error: 'Authentication required' });
     }
 
     if (!roles.includes(authReq.user.role)) {
-      return res.status(403).json({ error: 'Insufficient permissions' });
+      return (res as any).status(403).json({ error: 'Insufficient permissions' });
     }
 
     next();
@@ -66,7 +73,7 @@ export const requireRole = (roles: string[]) => {
 export const requireClientAccess = (req: Request, res: Response, next: NextFunction) => {
   const authReq = req as AuthRequest;
   if (!authReq.user) {
-    return res.status(401).json({ error: 'Authentication required' });
+    return (res as any).status(401).json({ error: 'Authentication required' });
   }
 
   // Super admin can access all clients
@@ -78,7 +85,7 @@ export const requireClientAccess = (req: Request, res: Response, next: NextFunct
   const clientId = req.params.clientId || req.body.client_id;
   
   if (clientId && authReq.user.client_id !== clientId) {
-    return res.status(403).json({ error: 'Access denied to this client' });
+    return (res as any).status(403).json({ error: 'Access denied to this client' });
   }
 
   next();

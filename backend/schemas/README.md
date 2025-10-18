@@ -125,3 +125,107 @@ The `role_based_sample_data.sql` file creates a complete example with:
 - Sessions expire after 24 hours by default
 - Failed access attempts are logged for security monitoring
 - Role permissions can be customized per client organization
+
+---
+
+## 🆕 Role-Based Page Access Control (Latest)
+
+### New Schema Files
+
+#### 5. `role_page_access_schema.sql`
+**Description**: Comprehensive role-based page access control system.
+**Key Features**:
+- Dynamic page assignment to roles
+- Granular CRUD permissions per page
+- Access level control (none, read, write, admin)
+- Role hierarchy and audit logging
+- Web interface for role management
+
+#### 6. `insert_default_pages.sql`
+**Description**: Populates the `pages` table with all system pages.
+**Pages Include**:
+- Dashboard pages
+- Transaction pages (Sales, Purchases, Expenses)
+- Management pages (Users, Roles, Stores, Clients)
+- Report pages
+- Admin pages
+- Settings pages
+
+#### 7. `seed_example_roles.sql`
+**Description**: Creates example roles with page assignments.
+**Example Roles**:
+- **Store Manager** - Full access to operations
+- **Accountant** - Financial data and reports
+- **Cashier** - Sales transactions only
+- **Inventory Manager** - Purchase management
+- **Report Viewer** - Read-only reports
+
+#### 8. `ROLE_PAGE_ACCESS_GUIDE.md`
+**Description**: Complete documentation for the page access system.
+
+### Setup Instructions
+
+```bash
+# Step 1: Create RBAC tables
+psql -d your_database -f role_page_access_schema.sql
+
+# Step 2: Insert default pages
+psql -d your_database -f insert_default_pages.sql
+
+# Step 3: (Optional) Create example roles
+psql -d your_database -f seed_example_roles.sql
+```
+
+### Web Interface
+
+Access the role management page at:
+**http://localhost:3000/dashboard/roles**
+
+**Features**:
+- ✅ Create new roles
+- ✅ Assign pages to roles
+- ✅ Set granular permissions (Create, Read, Update, Delete)
+- ✅ Set access levels (None, Read, Write, Admin)
+- ✅ Edit and delete roles
+- ✅ View role summaries
+
+### How It Works
+
+1. **Pages Table**: Stores all available pages in the system
+2. **System Roles**: Define roles like Manager, Cashier, etc.
+3. **Role-Page Access**: Links roles to pages with specific permissions
+4. **Users**: Assigned to roles, inherit page access
+5. **Frontend**: Dynamically shows/hides pages based on permissions
+
+### Page Permissions
+
+Each role-page assignment includes:
+- **Access Level**: Overall access (none/read/write/admin)
+- **Can Create**: Permission to create new records
+- **Can Read**: Permission to view data
+- **Can Update**: Permission to modify data
+- **Can Delete**: Permission to remove data
+- **Can Export**: Permission to export data
+- **Can Import**: Permission to import data
+
+### API Endpoints
+
+```
+GET    /api/roles                      # Get all roles
+GET    /api/roles/pages                # Get all available pages
+GET    /api/roles/:roleId/access       # Get role permissions
+POST   /api/roles                      # Create new role
+POST   /api/roles/:roleId/access       # Update role permissions
+PUT    /api/roles/:roleId              # Update role details
+DELETE /api/roles/:roleId              # Delete role
+```
+
+### Security
+
+- Both `super_admin` and `admin` users can manage roles
+- All changes are logged in `role_audit_log`
+- Cannot delete roles assigned to users
+- Backend validates permissions on every request
+- Admins manage roles within their client scope
+
+For detailed documentation, see **ROLE_PAGE_ACCESS_GUIDE.md**

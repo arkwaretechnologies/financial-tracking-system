@@ -50,6 +50,7 @@ interface User {
   created_at: string;
   first_name?: string;
   last_name?: string;
+  phone_no?: string;
   store_id?: string;
   is_active?: boolean;
 }
@@ -58,12 +59,21 @@ interface CreateUserRequest {
   username: string;
   email: string;
   password: string;
-  role: 'admin' | 'client_user';
+  role: string;
   client_id: string;
   first_name?: string;
   last_name?: string;
+  phone_no?: string;
   store_id?: string;
   is_active?: boolean;
+}
+
+interface SystemRole {
+  id: string;
+  name: string;
+  description?: string;
+  client_id: string;
+  created_at: string;
 }
 
 interface CreateSaleRequest {
@@ -194,13 +204,31 @@ class ApiClient {
     
     if (!response.ok) {
       let errorMessage;
+      let errorCode;
       const contentType = response.headers.get('content-type');
+      
       if (contentType && contentType.includes('application/json')) {
         const errorData = await response.json();
         errorMessage = errorData.message || errorData.details || errorData.error || `HTTP error! status: ${response.status}`;
+        errorCode = errorData.code;
       } else {
         errorMessage = await response.text();
       }
+      
+      // Handle token expiration
+      if (response.status === 401 || response.status === 403) {
+        if (errorCode === 'TOKEN_EXPIRED' || errorMessage.includes('Invalid token') || errorMessage.includes('Token expired')) {
+          // Clear local storage and redirect to login
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            localStorage.removeItem('stores');
+            localStorage.removeItem('selectedStore');
+            window.location.href = '/login?expired=true';
+          }
+        }
+      }
+      
       throw new Error(errorMessage);
     }
   return response.json();
@@ -272,6 +300,19 @@ class ApiClient {
 
   async createUser(token: string, userData: CreateUserRequest): Promise<{ user: User; message: string }> {
     return this.post('/users', userData, token);
+  }
+
+  async updateUser(token: string, userId: string, userData: Partial<CreateUserRequest>): Promise<{ user: User; message: string }> {
+    return this.put(`/users/${userId}`, userData, token);
+  }
+
+  async deleteUser(token: string, userId: string): Promise<{ message: string }> {
+    return this.delete(`/users/${userId}`, token);
+  }
+
+  // System roles API
+  async getSystemRolesByClient(token: string, clientId: string): Promise<{ roles: SystemRole[] }> {
+    return this.get(`/system-roles/client/${clientId}`, token);
   }
 
   // Add sales API support
@@ -396,6 +437,39 @@ class ApiClient {
       url += `&store_id=${store_id}`;
     }
     return this.get(url, token);
+  }
+
+  // Role Management APIs
+  async getRoles(token: string): Promise<{ roles: any[] }> {
+    return this.get('/roles', token);
+  }
+
+  async getPages(token: string): Promise<{ pages: any[]; groupedPages: any }> {
+    return this.get('/roles/pages', token);
+  }
+
+  async getRoleAccess(token: string, roleId: string): Promise<{ access: any[] }> {
+    return this.get(`/roles/${roleId}/access`, token);
+  }
+
+  async createRole(token: string, roleData: { name: string; roleType: string; description?: string }): Promise<{ role: any }> {
+    return this.post('/roles', roleData, token);
+  }
+
+  async updateRole(token: string, roleId: string, roleData: { name?: string; description?: string; isActive?: boolean }): Promise<{ role: any }> {
+    return this.put(`/roles/${roleId}`, roleData, token);
+  }
+
+  async updateRoleAccess(token: string, roleId: string, pageAccess: any[]): Promise<{ access: any[] }> {
+    return this.post(`/roles/${roleId}/access`, { pageAccess }, token);
+  }
+
+  async deleteRole(token: string, roleId: string): Promise<{ message: string; role: any }> {
+    return this.delete(`/roles/${roleId}`, token);
+  }
+
+  async getAccessMatrix(token: string): Promise<{ accessMatrix: any }> {
+    return this.get('/roles/access-matrix', token);
   }
 }
 

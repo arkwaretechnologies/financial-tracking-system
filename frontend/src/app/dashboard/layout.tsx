@@ -2,6 +2,7 @@
 
 import { useAuth } from '@/contexts/AuthContext';
 import DashboardNav from '@/components/DashboardNav';
+import { Toaster } from '@/components/ui/toaster';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
@@ -39,6 +40,7 @@ export default function DashboardLayout({
           {children}
         </main>
       </div>
+      <Toaster />
     </div>
   );
 }

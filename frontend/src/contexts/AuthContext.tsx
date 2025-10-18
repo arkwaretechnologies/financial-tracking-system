@@ -73,23 +73,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const storedSelectedStore = localStorage.getItem('selectedStore');
 
     if (storedToken && storedUser) {
-      const parsedUser = JSON.parse(storedUser);
-      setUser(parsedUser);
-      setToken(storedToken);
+      try {
+        const parsedUser = JSON.parse(storedUser);
+        
+        // Validate token format (basic check)
+        if (storedToken.split('.').length === 3) {
+          setUser(parsedUser);
+          setToken(storedToken);
 
-      if (storedStores) {
-        setStores(JSON.parse(storedStores));
-      }
+          if (storedStores) {
+            setStores(JSON.parse(storedStores));
+          }
 
-      if (storedSelectedStore) {
-        _setSelectedStore(storedSelectedStore);
-      } else if (parsedUser.store_id) {
-        setSelectedStore(parsedUser.store_id);
-      } else if (storedStores) {
-        const stores = JSON.parse(storedStores);
-        if (stores.length > 0) {
-          setSelectedStore('all'); // Or a default store ID
+          if (storedSelectedStore) {
+            _setSelectedStore(storedSelectedStore);
+          } else if (parsedUser.store_id) {
+            setSelectedStore(parsedUser.store_id);
+          } else if (storedStores) {
+            const stores = JSON.parse(storedStores);
+            if (stores.length > 0) {
+              setSelectedStore('all');
+            }
+          }
+        } else {
+          // Invalid token format, clear storage
+          console.warn('Invalid token format detected, clearing storage');
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          localStorage.removeItem('stores');
+          localStorage.removeItem('selectedStore');
         }
+      } catch (error) {
+        console.error('Error parsing stored data:', error);
+        // Clear corrupted data
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('stores');
+        localStorage.removeItem('selectedStore');
       }
     } else {
       // If no token, ensure user is logged out

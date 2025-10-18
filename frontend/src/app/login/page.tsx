@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +13,7 @@ import { api } from '@/lib/api';
 type LoginStep = 'clientId' | 'userLogin';
 
 export default function LoginPage() {
+  const searchParams = useSearchParams();
   const [step, setStep] = useState<LoginStep>('clientId');
   const [clientId, setClientId] = useState('');
   const [clientName, setClientName] = useState('');
@@ -19,7 +21,15 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showExpiredMessage, setShowExpiredMessage] = useState(false);
   const { login } = useAuth();
+
+  useEffect(() => {
+    if (searchParams.get('expired') === 'true') {
+      setShowExpiredMessage(true);
+      setTimeout(() => setShowExpiredMessage(false), 8000);
+    }
+  }, [searchParams]);
 
   const handleClientIdSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -169,6 +179,13 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-6">
+        {showExpiredMessage && (
+          <Alert>
+            <AlertDescription>
+              Your session has expired. Please log in again to continue.
+            </AlertDescription>
+          </Alert>
+        )}
         <div className="text-center">
           <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900">
             Financial Tracking System

@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import type { Request, Response } from 'express';
 import { authenticateToken } from '../middleware/auth';
 import { supabase } from '../config/supabase';
 import { v4 as uuidv4 } from 'uuid';
@@ -9,7 +10,7 @@ const router = Router();
 router.use(authenticateToken);
 
 // GET /api/roles - Get all system roles
-router.get('/', async (req, res) => {
+router.get('/', async (req: Request, res: Response) => {
   try {
     const { data: roles, error } = await supabase
       .from('system_roles')
@@ -19,13 +20,13 @@ router.get('/', async (req, res) => {
 
     if (error) {
       console.error('Error fetching roles:', error);
-      return res.status(500).json({ error: 'Failed to fetch roles' });
+      return (res as any).status(500).json({ error: 'Failed to fetch roles' });
     }
 
-    res.json({ roles });
+    (res as any).json({ roles });
   } catch (error) {
     console.error('Error in GET /api/roles:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    (res as any).status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -47,7 +48,7 @@ router.get('/access-matrix', async (req, res) => {
 
     if (error) {
       console.error('Error fetching access matrix:', error);
-      return res.status(500).json({ error: 'Failed to fetch access matrix' });
+      return (res as any).status(500).json({ error: 'Failed to fetch access matrix' });
     }
 
     // Transform data into a structured format
@@ -80,10 +81,10 @@ router.get('/access-matrix', async (req, res) => {
       return acc;
     }, {});
 
-    res.json({ accessMatrix });
+    (res as any).json({ accessMatrix });
   } catch (error) {
     console.error('Error in GET /api/roles/access-matrix:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    (res as any).status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -100,7 +101,7 @@ router.get('/pages', async (req, res) => {
 
     if (error) {
       console.error('Error fetching pages:', error);
-      return res.status(500).json({ error: 'Failed to fetch pages' });
+      return (res as any).status(500).json({ error: 'Failed to fetch pages' });
     }
 
     // Group pages by group
@@ -112,10 +113,10 @@ router.get('/pages', async (req, res) => {
       return acc;
     }, {});
 
-    res.json({ pages, groupedPages });
+    (res as any).json({ pages, groupedPages });
   } catch (error) {
     console.error('Error in GET /api/roles/pages:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    (res as any).status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -137,13 +138,13 @@ router.get('/:roleId/access', async (req, res) => {
 
     if (error) {
       console.error('Error fetching role access:', error);
-      return res.status(500).json({ error: 'Failed to fetch role access' });
+      return (res as any).status(500).json({ error: 'Failed to fetch role access' });
     }
 
-    res.json({ access });
+    (res as any).json({ access });
   } catch (error) {
     console.error('Error in GET /api/roles/:roleId/access:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    (res as any).status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -153,13 +154,13 @@ router.post('/', async (req, res) => {
     const { name, roleType, description } = req.body;
     
     if (!name || !roleType) {
-      return res.status(400).json({ error: 'Name and role type are required' });
+      return (res as any).status(400).json({ error: 'Name and role type are required' });
     }
 
-    // Check if user has permission to create roles (super_admin only)
+    // Check if user has permission to create roles (super_admin and admin)
     const userRole = (req as any).user.role;
-    if (userRole !== 'super_admin') {
-      return res.status(403).json({ error: 'Only super administrators can create roles' });
+    if (userRole !== 'super_admin' && userRole !== 'admin') {
+      return (res as any).status(403).json({ error: 'Only administrators can create roles' });
     }
 
     const { data: role, error } = await supabase
@@ -174,7 +175,7 @@ router.post('/', async (req, res) => {
 
     if (error) {
       console.error('Error creating role:', error);
-      return res.status(500).json({ error: 'Failed to create role' });
+      return (res as any).status(500).json({ error: 'Failed to create role' });
     }
 
     // Log the role creation
@@ -185,10 +186,10 @@ router.post('/', async (req, res) => {
       details: { name, roleType, description }
     }]);
 
-    res.status(201).json({ role });
+    (res as any).status(201).json({ role });
   } catch (error) {
     console.error('Error in POST /api/roles:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    (res as any).status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -199,13 +200,13 @@ router.post('/:roleId/access', async (req, res) => {
     const { pageAccess } = req.body; // Array of { pageId, accessLevel, canCreate, canRead, canUpdate, canDelete, canExport, canImport }
     
     if (!Array.isArray(pageAccess)) {
-      return res.status(400).json({ error: 'pageAccess must be an array' });
+      return (res as any).status(400).json({ error: 'pageAccess must be an array' });
     }
 
-    // Check if user has permission to update role access (super_admin only)
+    // Check if user has permission to update role access (super_admin and admin)
     const userRole = (req as any).user.role;
-    if (userRole !== 'super_admin') {
-      return res.status(403).json({ error: 'Only super administrators can update role access' });
+    if (userRole !== 'super_admin' && userRole !== 'admin') {
+      return (res as any).status(403).json({ error: 'Only administrators can update role access' });
     }
 
     // Start a transaction-like operation
@@ -229,7 +230,7 @@ router.post('/:roleId/access', async (req, res) => {
 
     if (deleteError) {
       console.error('Error deleting existing access:', deleteError);
-      return res.status(500).json({ error: 'Failed to update role access' });
+      return (res as any).status(500).json({ error: 'Failed to update role access' });
     }
 
     // Insert new access permissions
@@ -240,7 +241,7 @@ router.post('/:roleId/access', async (req, res) => {
 
     if (insertError) {
       console.error('Error inserting new access:', insertError);
-      return res.status(500).json({ error: 'Failed to update role access' });
+      return (res as any).status(500).json({ error: 'Failed to update role access' });
     }
 
     // Log the access update
@@ -251,10 +252,10 @@ router.post('/:roleId/access', async (req, res) => {
       details: { pageAccessCount: pageAccess.length }
     }]);
 
-    res.json({ access: newAccess });
+    (res as any).json({ access: newAccess });
   } catch (error) {
     console.error('Error in POST /api/roles/:roleId/access:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    (res as any).status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -264,10 +265,10 @@ router.put('/:roleId', async (req, res) => {
     const { roleId } = req.params;
     const { name, description, isActive } = req.body;
     
-    // Check if user has permission to update roles (super_admin only)
+    // Check if user has permission to update roles (super_admin and admin)
     const userRole = (req as any).user.role;
-    if (userRole !== 'super_admin') {
-      return res.status(403).json({ error: 'Only super administrators can update roles' });
+    if (userRole !== 'super_admin' && userRole !== 'admin') {
+      return (res as any).status(403).json({ error: 'Only administrators can update roles' });
     }
 
     const updateData: any = {};
@@ -284,7 +285,7 @@ router.put('/:roleId', async (req, res) => {
 
     if (error) {
       console.error('Error updating role:', error);
-      return res.status(500).json({ error: 'Failed to update role' });
+      return (res as any).status(500).json({ error: 'Failed to update role' });
     }
 
     // Log the role update
@@ -295,10 +296,10 @@ router.put('/:roleId', async (req, res) => {
       details: updateData
     }]);
 
-    res.json({ role });
+    (res as any).json({ role });
   } catch (error) {
     console.error('Error in PUT /api/roles/:roleId:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    (res as any).status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -307,10 +308,10 @@ router.delete('/:roleId', async (req, res) => {
   try {
     const { roleId } = req.params;
     
-    // Check if user has permission to delete roles (super_admin only)
+    // Check if user has permission to delete roles (super_admin and admin)
     const userRole = (req as any).user.role;
-    if (userRole !== 'super_admin') {
-      return res.status(403).json({ error: 'Only super administrators can delete roles' });
+    if (userRole !== 'super_admin' && userRole !== 'admin') {
+      return (res as any).status(403).json({ error: 'Only administrators can delete roles' });
     }
 
     // Check if role is assigned to any users
@@ -322,7 +323,7 @@ router.delete('/:roleId', async (req, res) => {
       .limit(1);
 
     if (assignments && assignments.length > 0) {
-      return res.status(400).json({ error: 'Cannot delete role that is assigned to users' });
+      return (res as any).status(400).json({ error: 'Cannot delete role that is assigned to users' });
     }
 
     // Soft delete the role
@@ -335,7 +336,7 @@ router.delete('/:roleId', async (req, res) => {
 
     if (error) {
       console.error('Error deleting role:', error);
-      return res.status(500).json({ error: 'Failed to delete role' });
+      return (res as any).status(500).json({ error: 'Failed to delete role' });
     }
 
     // Log the role deletion
@@ -346,10 +347,10 @@ router.delete('/:roleId', async (req, res) => {
       details: { roleName: role.name }
     }]);
 
-    res.json({ message: 'Role deleted successfully', role });
+    (res as any).json({ message: 'Role deleted successfully', role });
   } catch (error) {
     console.error('Error in DELETE /api/roles/:roleId:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    (res as any).status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -363,7 +364,7 @@ router.get('/user/:userId/access', async (req, res) => {
     const currentUserRole = (req as any).user.role;
     
     if (currentUserId !== userId && currentUserRole !== 'super_admin') {
-      return res.status(403).json({ error: 'Can only check your own access' });
+      return (res as any).status(403).json({ error: 'Can only check your own access' });
     }
 
     const { data: accessiblePages, error } = await supabase
@@ -371,13 +372,13 @@ router.get('/user/:userId/access', async (req, res) => {
 
     if (error) {
       console.error('Error fetching user accessible pages:', error);
-      return res.status(500).json({ error: 'Failed to fetch accessible pages' });
+      return (res as any).status(500).json({ error: 'Failed to fetch accessible pages' });
     }
 
-    res.json({ accessiblePages });
+    (res as any).json({ accessiblePages });
   } catch (error) {
     console.error('Error in GET /api/roles/user/:userId/access:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    (res as any).status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -387,7 +388,7 @@ router.post('/check-access', async (req, res) => {
     const { userId, pageKey } = req.body;
     
     if (!userId || !pageKey) {
-      return res.status(400).json({ error: 'userId and pageKey are required' });
+      return (res as any).status(400).json({ error: 'userId and pageKey are required' });
     }
     
     // Users can only check their own access unless they're super_admin
@@ -395,7 +396,7 @@ router.post('/check-access', async (req, res) => {
     const currentUserRole = (req as any).user.role;
     
     if (currentUserId !== userId && currentUserRole !== 'super_admin') {
-      return res.status(403).json({ error: 'Can only check your own access' });
+      return (res as any).status(403).json({ error: 'Can only check your own access' });
     }
 
     const { data: accessCheck, error } = await supabase
@@ -406,14 +407,15 @@ router.post('/check-access', async (req, res) => {
 
     if (error) {
       console.error('Error checking page access:', error);
-      return res.status(500).json({ error: 'Failed to check page access' });
+      return (res as any).status(500).json({ error: 'Failed to check page access' });
     }
 
-    res.json({ accessCheck: accessCheck[0] || { has_access: false } });
+    (res as any).json({ accessCheck: accessCheck[0] || { has_access: false } });
   } catch (error) {
     console.error('Error in POST /api/roles/check-access:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    (res as any).status(500).json({ error: 'Internal server error' });
   }
 });
 
 export default router;
+

@@ -1,4 +1,4 @@
-import { Request, Response } from 'express';
+import type { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { supabase } from '../config/supabase';
@@ -6,10 +6,10 @@ import { LoginRequest } from '../types';
 
 export const login = async (req: Request, res: Response) => {
   try {
-    const { client_id, username, email, password }: LoginRequest & { username?: string } = req.body;
+    const { client_id, username, email, password }: LoginRequest & { username?: string } = (req as any).body;
 
     if (!client_id || !password || (!username && !email)) {
-      return res.status(400).json({ error: 'Client ID, password, and either username or email are required' });
+      return (res as any).status(400).json({ error: 'Client ID, password, and either username or email are required' });
     }
 
     // First, verify the client exists and get client data
@@ -20,7 +20,7 @@ export const login = async (req: Request, res: Response) => {
       .single();
 
     if (clientError || !client) {
-      return res.status(404).json({ error: 'Client not found' });
+      return (res as any).status(404).json({ error: 'Client not found' });
     }
 
     // Find user by username/email and client_id
@@ -38,13 +38,13 @@ export const login = async (req: Request, res: Response) => {
     const { data: user, error: userError } = await userQuery.single();
 
     if (userError || !user) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      return (res as any).status(401).json({ error: 'Invalid credentials' });
     }
 
     // Verify password
     const isValidPassword = await bcrypt.compare(password, user.password);
     if (!isValidPassword) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      return (res as any).status(401).json({ error: 'Invalid credentials' });
     }
 
     // Generate JWT token
@@ -60,12 +60,13 @@ export const login = async (req: Request, res: Response) => {
       },
       process.env.JWT_SECRET || 'fallback-secret',
       { expiresIn: '24h' }
+      // { expiresIn: '7d' }
     );
 
     // Return user data without password
     const { password: _, ...userWithoutPassword } = user;
 
-    res.json({
+    (res as any).json({
       token,
       user: {
         ...userWithoutPassword,
@@ -80,16 +81,16 @@ export const login = async (req: Request, res: Response) => {
 
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    (res as any).status(500).json({ error: 'Internal server error' });
   }
 };
 
 export const register = async (req: Request, res: Response) => {
   try {
-    const { username, email, password, role, client_id } = req.body;
+    const { username, email, password, role, client_id } = (req as any).body;
 
     if (!username || !email || !password || !role || !client_id) {
-      return res.status(400).json({ error: 'Username, email, password, role, and client_id are required' });
+      return (res as any).status(400).json({ error: 'Username, email, password, role, and client_id are required' });
     }
 
     // Hash password
@@ -110,7 +111,7 @@ export const register = async (req: Request, res: Response) => {
 
     if (error) {
       if (error.code === '23505') { // Unique violation
-        return res.status(409).json({ error: 'Username or email already exists' });
+        return (res as any).status(409).json({ error: 'Username or email already exists' });
       }
       throw error;
     }
@@ -118,23 +119,23 @@ export const register = async (req: Request, res: Response) => {
     // Return user data without password
     const { password: _, ...userWithoutPassword } = user;
 
-    res.status(201).json({
+    (res as any).status(201).json({
       user: userWithoutPassword,
       message: 'User created successfully'
     });
 
   } catch (error) {
     console.error('Registration error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    (res as any).status(500).json({ error: 'Internal server error' });
   }
 };
 
 export const validateClient = async (req: Request, res: Response) => {
   try {
-    const { client_id } = req.body;
+    const { client_id } = (req as any).body;
 
     if (!client_id) {
-      return res.status(400).json({ error: 'Client ID is required' });
+      return (res as any).status(400).json({ error: 'Client ID is required' });
     }
 
     // Check if client exists in the database
@@ -145,10 +146,10 @@ export const validateClient = async (req: Request, res: Response) => {
       .single();
 
     if (error || !client) {
-      return res.status(404).json({ error: 'Client not found' });
+      return (res as any).status(404).json({ error: 'Client not found' });
     }
 
-    res.json({ 
+    (res as any).json({ 
       valid: true, 
       client: {
         id: client.id,
@@ -162,7 +163,7 @@ export const validateClient = async (req: Request, res: Response) => {
 
   } catch (error) {
     console.error('Client validation error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    (res as any).status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -177,13 +178,13 @@ export const me = async (req: Request, res: Response) => {
       .single();
 
     if (error || !user) {
-      return res.status(404).json({ error: 'User not found' });
+      return (res as any).status(404).json({ error: 'User not found' });
     }
 
-    res.json({ user });
+    (res as any).json({ user });
 
   } catch (error) {
     console.error('Get user error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    (res as any).status(500).json({ error: 'Internal server error' });
   }
 };

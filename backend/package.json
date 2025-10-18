@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "dev": "nodemon src/index.ts",
+    "dev": "nodemon --exec ts-node --project tsconfig.dev.json src/index.ts",
     "build": "npx tsc",
     "start": "npm run build && node dist/index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -16,6 +16,7 @@
     "@supabase/supabase-js": "^2.57.4",
     "@types/uuid": "^10.0.0",
     "bcryptjs": "^3.0.2",
+    "body-parser": "^1.20.3",
     "cors": "^2.8.5",
     "dotenv": "^17.2.2",
     "express": "^4.19.2",

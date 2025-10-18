@@ -1,4 +1,5 @@
 import express from 'express';
+import type { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
@@ -10,6 +11,7 @@ import clientRoutes from './routes/clients';
 import storeRoutes from './routes/stores';
 import transactionRoutes from './routes/transactions';
 import rolesRoutes from './routes/roles';
+import systemRolesRoutes from './routes/system-roles';
 import salesRoutes from './routes/sales';
 import purchaseRoutes from './routes/purchases';
 import expenseRoutes from './routes/expenses';
@@ -44,6 +46,7 @@ app.use('/api/clients', clientRoutes);
 app.use('/api/stores', storeRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/roles', rolesRoutes);
+app.use('/api/system-roles', systemRolesRoutes);
 app.use('/api/sales', salesRoutes);
 app.use('/api/purchases', purchaseRoutes);
 app.use('/api/expenses', expenseRoutes);
@@ -52,14 +55,14 @@ app.use('/api/reports', reportsRoutes);
 
 
 // Health check endpoint
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+app.get('/api/health', (req: Request, res: Response): void => {
+  (res as any).json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
 // Error handling middleware
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((err: any, req: Request, res: Response, next: NextFunction): void => {
   console.error(err.stack);
-  res.status(500).json({ 
+  (res as any).status(500).json({ 
     error: 'Something went wrong!',
     message: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
   });

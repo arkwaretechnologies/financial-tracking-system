@@ -1,7 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
+import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -10,97 +12,267 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, Edit, Plus, Users as UsersIcon } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Plus, Edit, Trash2, UsersIcon } from 'lucide-react';
 
 interface ClientUser {
   id: string;
+  username: string;
   email: string;
-  name: string;
-  role: 'admin' | 'client_user';
-  store_id: string;
-  store_name: string;
+  role: 'super_admin' | 'admin' | 'client_user';
+  client_id: string;
   created_at: string;
-  status: 'active' | 'inactive';
+  first_name?: string;
+  last_name?: string;
+  phone?: string;
+  store_id?: string;
+  status?: string;
 }
 
-interface Role {
+interface Store {
   id: string;
   name: string;
-  description: string;
-  permissions: string[]; // page slugs like 'sales', 'purchases', etc.
+  client_id: string;
+}
+
+interface SystemRole {
+  id: string;
+  name: string;
+  description?: string;
+  client_id: string;
+  created_at: string;
 }
 
 export default function ClientUsersPage() {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
+  const { toast } = useToast();
   const [users, setUsers] = useState<ClientUser[]>([]);
+  const [stores, setStores] = useState<Store[]>([]);
+  const [systemRoles, setSystemRoles] = useState<SystemRole[]>([]);
+  const [loading, setLoading] = useState(true);
   const [newUser, setNewUser] = useState({
+    username: '',
     email: '',
-    name: '',
-    role: 'client_user' as 'admin' | 'client_user',
-    store_id: '',
-    password: ''
+    password: '',
+    first_name: '',
+    last_name: '',
+    phone: '',
+    role: '',
+    store_id: ''
   });
   const [editingUser, setEditingUser] = useState<ClientUser | null>(null);
+  const [editUserData, setEditUserData] = useState<{
+    username: string;
+    email: string;
+    first_name: string;
+    last_name: string;
+    phone: string;
+    role: string;
+    store_id: string;
+  }>({ username: '', email: '', first_name: '', last_name: '', phone: '', role: '', store_id: '' });
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [isAddRoleDialogOpen, setIsAddRoleDialogOpen] = useState(false);
-  const [newRole, setNewRole] = useState<Omit<Role, 'id'>>({ name: '', description: '', permissions: [] });
-  const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
-  const [roles, setRoles] = useState<Role[]>([
-    { id: '1', name: 'Admin', description: 'Full access to all features', permissions: ['sales', 'purchases', 'user-management', 'stores', 'reports', 'settings'] },
-    { id: '2', name: 'Manager', description: 'Manage operations and users', permissions: ['sales', 'purchases', 'user-management', 'stores'] },
-    { id: '3', name: 'Viewer', description: 'Can view reports only', permissions: ['reports'] },
-  ]);
-  // Add role edit dialog state
-  const [isEditRoleDialogOpen, setIsEditRoleDialogOpen] = useState(false);
-  const [roleToEdit, setRoleToEdit] = useState<Role | null>(null);
+  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+  const [passwordResetUser, setPasswordResetUser] = useState<ClientUser | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
-  const handleUpdateRole = () => {
-    if (!roleToEdit) return;
-    setRoles(roles.map(r => r.id === roleToEdit.id ? { ...roleToEdit, permissions: selectedPermissions } : r));
-    setRoleToEdit(null);
-    setSelectedPermissions([]);
-    setIsEditRoleDialogOpen(false);
+  // Fetch users, stores, and system roles on mount
+  useEffect(() => {
+    if (user?.client_id && token) {
+      fetchUsers();
+      fetchStores();
+      fetchSystemRoles();
+    }
+  }, [user?.client_id, token]);
+
+  const fetchUsers = async () => {
+    if (!token || !user?.client_id) return;
+    
+    try {
+      setLoading(true);
+      const response = await api.getUsersByClient(token, user.client_id);
+      
+      // Transform the response to match our interface
+      const transformedUsers = response.users.map((user: any) => ({
+        ...user,
+        status: 'active' // Default status
+      }));
+      
+      setUsers(transformedUsers);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch users',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleEditUser = () => {
-    if (!editingUser) return;
+  const fetchStores = async () => {
+    if (!token || !user?.client_id) return;
+    
+    try {
+      const response = await api.getStoresByClient(token, user.client_id);
+      setStores(response.stores);
+    } catch (error) {
+      console.error('Error fetching stores:', error);
+    }
+  };
 
-    setUsers(users.map(u =>
-      u.id === editingUser.id
-        ? {
-            ...editingUser,
-          }
-        : u
-    ));
+  const fetchSystemRoles = async () => {
+    if (!token || !user?.client_id) return;
+    
+    try {
+      const response = await api.getSystemRolesByClient(token, user.client_id);
+      setSystemRoles(response.roles);
+    } catch (error) {
+      console.error('Error fetching system roles:', error);
+    }
+  };
+
+  const handleAddUser = async () => {
+    if (!token || !user?.client_id) return;
+    if (!newUser.username || !newUser.email || !newUser.password || !newUser.first_name || !newUser.last_name) {
+      toast({
+        title: 'Validation Error',
+        description: 'Please fill in all required fields',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    try {
+      await api.createUser(token, {
+        username: newUser.username,
+        email: newUser.email,
+        password: newUser.password,
+        role: newUser.role,
+        client_id: user.client_id,
+        store_id: newUser.store_id || undefined,
+        first_name: newUser.first_name,
+        last_name: newUser.last_name,
+        phone_no: newUser.phone
+      });
+
+      toast({
+        title: 'Success',
+        description: 'User created successfully'
+      });
+
+      setNewUser({ username: '', email: '', password: '', first_name: '', last_name: '', phone: '', role: '', store_id: '' });
+      setIsAddDialogOpen(false);
+      fetchUsers();
+    } catch (error: any) {
+      console.error('Error creating user:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to create user',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleEditUser = async () => {
+    if (!editingUser || !token) return;
+
+    try {
+      await api.updateUser(token, editingUser.id, {
+        username: editUserData.username,
+        email: editUserData.email,
+        role: editUserData.role,
+        client_id: user?.client_id || '',
+        store_id: editUserData.store_id || undefined,
+        first_name: editUserData.first_name,
+        last_name: editUserData.last_name,
+        phone_no: editUserData.phone
+      });
+
+      toast({
+        title: 'Success',
+        description: 'User updated successfully'
+      });
+
     setEditingUser(null);
     setIsEditDialogOpen(false);
+      fetchUsers();
+    } catch (error: any) {
+      console.error('Error updating user:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to update user',
+        variant: 'destructive'
+      });
+    }
   };
 
-  const handleDeleteUser = (userId: string) => {
-    setUsers(users.filter(u => u.id !== userId));
+  const handleDeleteUser = async (userId: string) => {
+    if (!token) return;
+
+    try {
+      await api.deleteUser(token, userId);
+      toast({
+        title: 'Success',
+        description: 'User deleted successfully'
+      });
+      fetchUsers();
+    } catch (error: any) {
+      console.error('Error deleting user:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to delete user',
+        variant: 'destructive'
+      });
+    }
   };
 
-  const toggleUserStatus = (userId: string) => {
-    setUsers(users.map(u =>
-      u.id === userId
-        ? { ...u, status: u.status === 'active' ? 'inactive' : 'active' }
-        : u
-    ));
+  const handleResetPassword = async () => {
+    if (!passwordResetUser || !token || !newPassword || !confirmPassword) return;
+
+    if (newPassword !== confirmPassword) {
+      toast({
+        title: 'Validation Error',
+        description: 'Passwords do not match',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    try {
+      await api.updateUser(token, passwordResetUser.id, {
+        password: newPassword,
+        client_id: user?.client_id || ''
+      });
+
+      toast({
+        title: 'Success',
+        description: 'Password reset successfully'
+      });
+
+      setPasswordResetUser(null);
+      setNewPassword('');
+      setConfirmPassword('');
+      setIsPasswordDialogOpen(false);
+    } catch (error: any) {
+      console.error('Error resetting password:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to reset password',
+        variant: 'destructive'
+      });
+    }
   };
 
-  if (user?.role !== 'admin') {
+  if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Card className="w-96">
-          <CardHeader>
-            <CardTitle className="text-center">Access Denied</CardTitle>
-            <CardDescription className="text-center">
-              You don&apos;t have permission to access user management.
-            </CardDescription>
-          </CardHeader>
-        </Card>
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+          <p className="mt-2 text-sm text-gray-600">Loading users...</p>
+        </div>
       </div>
     );
   }
@@ -109,9 +281,9 @@ export default function ClientUsersPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">User Management</h1>
+          <h1 className="text-3xl font-bold">User Management</h1>
           <p className="text-muted-foreground">
-            Manage users for {user?.client_name}
+            Manage users and their permissions for your organization.
           </p>
         </div>
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
@@ -129,13 +301,14 @@ export default function ClientUsersPage() {
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="name">Full Name</Label>
+                  <Label htmlFor="username">Username</Label>
                 <Input
-                  id="name"
-                  value={newUser.name}
-                  onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
-                  placeholder="Enter full name"
+                    id="username"
+                    value={newUser.username}
+                    onChange={(e) => setNewUser({ ...newUser, username: e.target.value })}
+                    placeholder="Enter username"
                 />
               </div>
               <div className="grid gap-2">
@@ -147,6 +320,7 @@ export default function ClientUsersPage() {
                   onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
                   placeholder="Enter email address"
                 />
+                </div>
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="password">Password</Label>
@@ -158,25 +332,64 @@ export default function ClientUsersPage() {
                   placeholder="Enter password"
                 />
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="first_name">First Name</Label>
+                  <Input
+                    id="first_name"
+                    value={newUser.first_name}
+                    onChange={(e) => setNewUser({ ...newUser, first_name: e.target.value })}
+                    placeholder="Enter first name"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="last_name">Last Name</Label>
+                  <Input
+                    id="last_name"
+                    value={newUser.last_name}
+                    onChange={(e) => setNewUser({ ...newUser, last_name: e.target.value })}
+                    placeholder="Enter last name"
+                  />
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="phone">Phone Number</Label>
+                <Input
+                  id="phone"
+                  type="tel"
+                  value={newUser.phone}
+                  onChange={(e) => setNewUser({ ...newUser, phone: e.target.value })}
+                  placeholder="Enter phone number"
+                />
+              </div>
               <div className="grid gap-2">
                 <Label htmlFor="role">Role</Label>
-                <Select value={newUser.role} onValueChange={(value: 'admin' | 'client_user') => setNewUser({ ...newUser, role: value })}>
+                 <Select value={newUser.role} onValueChange={(value) => setNewUser({ ...newUser, role: value })}>
                   <SelectTrigger>
-                    <SelectValue />
+                     <SelectValue placeholder="Select a role" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="client_user">Client User</SelectItem>
+                     {systemRoles.map((role) => (
+                       <SelectItem key={role.id} value={role.name}>
+                         {role.name}
+                       </SelectItem>
+                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="store">Store</Label>
-                <Select value={newUser.store_id} onValueChange={(value) => setNewUser({ ...newUser, store_id: value })}>
+                <Label htmlFor="store">Store (Optional)</Label>
+                <Select value={newUser.store_id || undefined} onValueChange={(value) => setNewUser({ ...newUser, store_id: value === 'all' ? '' : value })}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select a store" />
+                    <SelectValue placeholder="Select a store (optional)" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="all">All Stores</SelectItem>
+                    {stores.filter(store => store.id && store.id.trim() !== '').map((store) => (
+                      <SelectItem key={store.id} value={store.id}>
+                        {store.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -185,7 +398,7 @@ export default function ClientUsersPage() {
               <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
                 Cancel
               </Button>
-              <Button>Add User</Button>
+              <Button onClick={handleAddUser}>Add User</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -212,7 +425,7 @@ export default function ClientUsersPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Admins</CardTitle>
+            <CardTitle className="text-sm font-medium">Admin Users</CardTitle>
             <UsersIcon className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -221,7 +434,7 @@ export default function ClientUsersPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Regular Users</CardTitle>
+            <CardTitle className="text-sm font-medium">Client Users</CardTitle>
             <UsersIcon className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -233,22 +446,24 @@ export default function ClientUsersPage() {
       <Tabs defaultValue="users" className="space-y-4">
         <TabsList>
           <TabsTrigger value="users">Users</TabsTrigger>
-          <TabsTrigger value="roles">Roles</TabsTrigger>
         </TabsList>
+
         <TabsContent value="users" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Users</CardTitle>
+              <CardTitle>All Users</CardTitle>
               <CardDescription>
-                Manage user accounts and permissions for your organization.
+                Manage and view all users in your organization.
               </CardDescription>
             </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>Username</TableHead>
                     <TableHead>Name</TableHead>
                     <TableHead>Email</TableHead>
+                    <TableHead>Phone</TableHead>
                     <TableHead>Role</TableHead>
                     <TableHead>Store</TableHead>
                     <TableHead>Status</TableHead>
@@ -259,19 +474,21 @@ export default function ClientUsersPage() {
                 <TableBody>
                   {users.map((user) => (
                     <TableRow key={user.id}>
-                      <TableCell className="font-medium">{user.name}</TableCell>
+                      <TableCell className="font-medium">{user.username}</TableCell>
+                      <TableCell>{user.first_name} {user.last_name}</TableCell>
                       <TableCell>{user.email}</TableCell>
+                      <TableCell>{user.phone || '-'}</TableCell>
                       <TableCell>
-                        <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
-                          {user.role === 'admin' ? 'Admin' : 'Client User'}
+                         <Badge variant="default">
+                           {user.role}
                         </Badge>
                       </TableCell>
-                      <TableCell>{user.store_name || 'All Stores'}</TableCell>
+                      <TableCell>
+                        {user.store_id ? stores.find(s => s.id === user.store_id)?.name || 'Unknown' : 'All Stores'}
+                      </TableCell>
                       <TableCell>
                         <Badge
                           variant={user.status === 'active' ? 'default' : 'destructive'}
-                          className="cursor-pointer"
-                          onClick={() => toggleUserStatus(user.id)}
                         >
                           {user.status}
                         </Badge>
@@ -284,10 +501,29 @@ export default function ClientUsersPage() {
                             size="sm"
                             onClick={() => {
                               setEditingUser(user);
+                              setEditUserData({
+                                username: user.username || '',
+                                email: user.email,
+                                first_name: user.first_name || '',
+                                last_name: user.last_name || '',
+                                phone: user.phone || '',
+                                role: user.role,
+                                store_id: user.store_id || ''
+                              });
                               setIsEditDialogOpen(true);
                             }}
                           >
                             <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setPasswordResetUser(user);
+                              setIsPasswordDialogOpen(true);
+                            }}
+                          >
+                            Reset Password
                           </Button>
                           <Button
                             variant="outline"
@@ -305,189 +541,8 @@ export default function ClientUsersPage() {
             </CardContent>
           </Card>
         </TabsContent>
-        <TabsContent value="roles" className="space-y-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <div>
-                <CardTitle>Role Access</CardTitle>
-                <CardDescription>
-                  View role assignments and permissions for users.
-                </CardDescription>
-              </div>
-              <Button size="sm" onClick={() => setIsAddRoleDialogOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Role
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Role</TableHead>
-                      <TableHead>Username</TableHead>
-                      <TableHead>Permission Page</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {users.map((user) => {
-                      // Map user role to role access matrix key
-                      const roleMapping = {
-                        'superadmin': 'Super Admin',
-                        'super_admin': 'Super Admin',
-                        'admin': 'Client Admin', 
-                        'client_user': 'Client Admin',
-                        'user': 'Store Manager',
-                        'manager': 'Store Manager',
-                        'accountant': 'Accountant',
-                        'cashier': 'Cashier',
-                        'viewer': 'Viewer',
-                        'store_manager': 'Store Manager'
-                      };
-                      
-                      const roleName = roleMapping[user.role as keyof typeof roleMapping] || 'Viewer';
-                      
-                      // Get the pages this user has access to based on their role
-                      const userRoleData = roles.find(r => r.name === roleName);
-                      
-                      // Handle case where role data is not found
-                      if (!userRoleData) {
-                        console.error(`Role data not found for role: ${roleName}`);
-                      }
-                      
-                      const accessiblePages = userRoleData?.permissions ? 
-                        userRoleData.permissions.map(p => ({
-                          page: p,
-                          accessLevel: 'admin'
-                        })) : [];
-                      
-                      return (
-                        <TableRow key={user.id}>
-                          <TableCell className="font-medium">
-                            <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
-                              {roleName}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>{user.name}</TableCell>
-                          <TableCell>
-                            {accessiblePages.length > 0 ? (
-                              <div className="space-y-1">
-                                {accessiblePages.map((perm, index) => (
-                                  <div key={index} className="flex items-center gap-2">
-                                    <Badge 
-                                      variant={
-                                        perm.accessLevel === 'admin' ? 'default' :
-                                        perm.accessLevel === 'write' ? 'secondary' :
-                                        perm.accessLevel === 'read' ? 'outline' : 'destructive'
-                                      }
-                                      className="text-xs"
-                                    >
-                                      {perm.accessLevel.toUpperCase()}
-                                    </Badge>
-                                    <span className="text-sm">{perm.page}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            ) : (
-                              <Badge variant="destructive" className="text-xs">
-                                No Access
-                              </Badge>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
 
-      {/* Add Role Dialog */}
-      <Dialog open={isAddRoleDialogOpen} onOpenChange={setIsAddRoleDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add New Role</DialogTitle>
-            <DialogDescription>
-              Create a new role and assign its permissions.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="role-name">Role Name</Label>
-              <Input
-                id="role-name"
-                value={newRole.name}
-                onChange={(e) => setNewRole({ ...newRole, name: e.target.value })}
-                placeholder="Enter role name (e.g., Manager, Viewer)"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="role-description">Description</Label>
-              <Input
-                id="role-description"
-                value={newRole.description}
-                onChange={(e) => setNewRole({ ...newRole, description: e.target.value })}
-                placeholder="Brief description of the role"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddRoleDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button>Add Role</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Role Dialog */}
-      <Dialog 
-        open={isEditRoleDialogOpen} 
-        onOpenChange={(open) => { 
-          setIsEditRoleDialogOpen(open); 
-          if (!open) { setRoleToEdit(null); setSelectedPermissions([]); }
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Role</DialogTitle>
-            <DialogDescription>
-              Update role details and adjust its permissions.
-            </DialogDescription>
-          </DialogHeader>
-          {roleToEdit && (
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label htmlFor="edit-role-name">Role Name</Label>
-                <Input
-                  id="edit-role-name"
-                  value={roleToEdit.name}
-                  onChange={(e) => setRoleToEdit({ ...roleToEdit, name: e.target.value })}
-                  placeholder="Enter role name"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="edit-role-description">Description</Label>
-                <Input
-                  id="edit-role-description"
-                  value={roleToEdit.description}
-                  onChange={(e) => setRoleToEdit({ ...roleToEdit, description: e.target.value })}
-                  placeholder="Brief description of the role"
-                />
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setIsEditRoleDialogOpen(false); }}>
-              Cancel
-            </Button>
-            <Button onClick={handleUpdateRole}>Save Changes</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
       {/* Edit User Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent>
@@ -499,12 +554,13 @@ export default function ClientUsersPage() {
           </DialogHeader>
           {editingUser && (
             <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="edit-name">Full Name</Label>
+                  <Label htmlFor="edit-username">Username</Label>
                 <Input
-                  id="edit-name"
-                  value={editingUser.name}
-                  onChange={(e) => setEditingUser({ ...editingUser, name: e.target.value })}
+                    id="edit-username"
+                    value={editUserData.username}
+                    onChange={(e) => setEditUserData({ ...editUserData, username: e.target.value })}
                 />
               </div>
               <div className="grid gap-2">
@@ -512,22 +568,72 @@ export default function ClientUsersPage() {
                 <Input
                   id="edit-email"
                   type="email"
-                  value={editingUser.email}
-                  onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
+                    value={editUserData.email}
+                    onChange={(e) => setEditUserData({ ...editUserData, email: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-first_name">First Name</Label>
+                  <Input
+                    id="edit-first_name"
+                    value={editUserData.first_name}
+                    onChange={(e) => setEditUserData({ ...editUserData, first_name: e.target.value })}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-last_name">Last Name</Label>
+                  <Input
+                    id="edit-last_name"
+                    value={editUserData.last_name}
+                    onChange={(e) => setEditUserData({ ...editUserData, last_name: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-phone">Phone Number</Label>
+                <Input
+                  id="edit-phone"
+                  type="tel"
+                  value={editUserData.phone}
+                  onChange={(e) => setEditUserData({ ...editUserData, phone: e.target.value })}
                 />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="edit-role">Role</Label>
                 <Select
-                  value={editingUser.role}
-                  onValueChange={(value: 'admin' | 'client_user') => setEditingUser({ ...editingUser, role: value })}
+                   value={editUserData.role}
+                   onValueChange={(value) => setEditUserData({ ...editUserData, role: value })}
+                 >
+                   <SelectTrigger>
+                     <SelectValue placeholder="Select a role" />
+                   </SelectTrigger>
+                   <SelectContent>
+                     {systemRoles.map((role) => (
+                       <SelectItem key={role.id} value={role.name}>
+                         {role.name}
+                       </SelectItem>
+                     ))}
+                   </SelectContent>
+                 </Select>
+               </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-store">Store (Optional)</Label>
+                <Select
+                  value={editUserData.store_id || undefined}
+                  onValueChange={(value) => setEditUserData({ ...editUserData, store_id: value === 'all' ? '' : value })}
                 >
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue placeholder="Select a store (optional)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="client_user">Client User</SelectItem>
+                    <SelectItem value="all">All Stores</SelectItem>
+                    {stores.filter(store => store.id && store.id.trim() !== '').map((store) => (
+                      <SelectItem key={store.id} value={store.id}>
+                        {store.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -538,6 +644,51 @@ export default function ClientUsersPage() {
               Cancel
             </Button>
             <Button onClick={handleEditUser}>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Password Reset Dialog */}
+      <Dialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reset Password</DialogTitle>
+            <DialogDescription>
+              Set a new password for {passwordResetUser?.first_name} {passwordResetUser?.last_name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="new-password">New Password</Label>
+              <Input
+                id="new-password"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Enter new password"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="confirm-password">Confirm Password</Label>
+              <Input
+                id="confirm-password"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Confirm new password"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setIsPasswordDialogOpen(false);
+              setNewPassword('');
+              setConfirmPassword('');
+              setPasswordResetUser(null);
+            }}>
+              Cancel
+            </Button>
+            <Button onClick={handleResetPassword}>Reset Password</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
