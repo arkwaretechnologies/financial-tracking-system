@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,7 @@ import { api } from '@/lib/api';
 
 type LoginStep = 'clientId' | 'userLogin';
 
-export default function LoginPage() {
+function LoginContent() {
   const searchParams = useSearchParams();
   const [step, setStep] = useState<LoginStep>('clientId');
   const [clientId, setClientId] = useState('');
@@ -210,5 +210,23 @@ export default function LoginPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="max-w-md w-full space-y-6">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-center">Loading...</div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    }>
+      <LoginContent />
+    </Suspense>
   );
 }
