@@ -242,7 +242,7 @@ export default function RolesPage() {
     if (!selectedRole || !token) return;
 
     try {
-      const pageAccessArray = Object.entries(roleAccess).map(([pageKey, access]) => ({
+      const pageAccessArray = Object.entries(roleAccess).map(([_, access]) => ({
         pageId: access.pageId,
         accessLevel: access.accessLevel,
         canCreate: access.canCreate,

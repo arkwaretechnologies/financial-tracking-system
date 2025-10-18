@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
@@ -78,18 +78,7 @@ export default function ClientUsersPage() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
-  // Fetch users, stores, and system roles on mount
-  useEffect(() => {
-    if (user?.client_id && token) {
-      fetchUsers();
-      fetchStores();
-    }
-    if (token) {
-      fetchSystemRoles();
-    }
-  }, [user?.client_id, token]);
-
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     if (!token || !user?.client_id) return;
     
     try {
@@ -113,9 +102,9 @@ export default function ClientUsersPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token, user?.client_id, toast]);
 
-  const fetchStores = async () => {
+  const fetchStores = useCallback(async () => {
     if (!token || !user?.client_id) return;
     
     try {
@@ -124,9 +113,9 @@ export default function ClientUsersPage() {
     } catch (error) {
       console.error('Error fetching stores:', error);
     }
-  };
+  }, [token, user?.client_id]);
 
-  const fetchSystemRoles = async () => {
+  const fetchSystemRoles = useCallback(async () => {
     if (!token) return;
     
     try {
@@ -141,7 +130,18 @@ export default function ClientUsersPage() {
         variant: 'destructive'
       });
     }
-  };
+  }, [token, toast]);
+
+  // Fetch users, stores, and system roles on mount
+  useEffect(() => {
+    if (user?.client_id && token) {
+      fetchUsers();
+      fetchStores();
+    }
+    if (token) {
+      fetchSystemRoles();
+    }
+  }, [user?.client_id, token, fetchUsers, fetchStores, fetchSystemRoles]);
 
   const handleAddUser = async () => {
     if (!token || !user?.client_id) return;
