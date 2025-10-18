@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,8 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, Edit, Plus, Shield, CheckSquare, Square } from 'lucide-react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Trash2, Edit, Plus, Shield } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { api } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
@@ -72,14 +71,7 @@ export default function RolesPage() {
     description: ''
   });
 
-  useEffect(() => {
-    if (token) {
-      fetchRoles();
-      fetchPages();
-    }
-  }, [token]);
-
-  const fetchRoles = async () => {
+  const fetchRoles = useCallback(async () => {
     if (!token) return;
     
     try {
@@ -96,9 +88,9 @@ export default function RolesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token, toast]);
 
-  const fetchPages = async () => {
+  const fetchPages = useCallback(async () => {
     if (!token) return;
     
     try {
@@ -108,7 +100,14 @@ export default function RolesPage() {
     } catch (error) {
       console.error('Error fetching pages:', error);
     }
-  };
+  }, [token]);
+
+  useEffect(() => {
+    if (token) {
+      fetchRoles();
+      fetchPages();
+    }
+  }, [token, fetchRoles, fetchPages]);
 
   const fetchRoleAccess = async (roleId: string) => {
     if (!token) return;
@@ -117,7 +116,7 @@ export default function RolesPage() {
       const response = await api.getRoleAccess(token, roleId);
       const accessMap: Record<string, PageAccess> = {};
       
-      response.access.forEach((item: any) => {
+      response.access.forEach((item: { page_id: string; pages: { page_key: string } }) => {
         accessMap[item.pages.page_key] = {
           pageId: item.page_id,
           accessLevel: item.access_level,
@@ -167,11 +166,12 @@ export default function RolesPage() {
       setNewRole({ name: '', roleType: 'client_role', description: '' });
       setIsAddRoleDialogOpen(false);
       fetchRoles();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error creating role:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create role';
       toast({
         title: 'Error',
-        description: error.message || 'Failed to create role',
+        description: errorMessage,
         variant: 'destructive'
       });
     }
@@ -194,11 +194,12 @@ export default function RolesPage() {
       setSelectedRole(null);
       setIsEditRoleDialogOpen(false);
       fetchRoles();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error updating role:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update role';
       toast({
         title: 'Error',
-        description: error.message || 'Failed to update role',
+        description: errorMessage,
         variant: 'destructive'
       });
     }
@@ -220,11 +221,12 @@ export default function RolesPage() {
       });
 
       fetchRoles();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error deleting role:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete role';
       toast({
         title: 'Error',
-        description: error.message || 'Failed to delete role',
+        description: errorMessage,
         variant: 'destructive'
       });
     }
@@ -261,11 +263,12 @@ export default function RolesPage() {
       setIsManageAccessDialogOpen(false);
       setSelectedRole(null);
       setRoleAccess({});
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error updating role access:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update role access';
       toast({
         title: 'Error',
-        description: error.message || 'Failed to update role access',
+        description: errorMessage,
         variant: 'destructive'
       });
     }
@@ -292,7 +295,7 @@ export default function RolesPage() {
     });
   };
 
-  const updateAccessPermission = (pageKey: string, field: keyof PageAccess, value: any) => {
+  const updateAccessPermission = (pageKey: string, field: keyof PageAccess, value: boolean) => {
     setRoleAccess(prev => ({
       ...prev,
       [pageKey]: {
