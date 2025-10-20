@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -34,30 +34,30 @@ export default function ExpensesPage() {
   const [searchRefNum, setSearchRefNum] = useState('');
   const [searchDescription, setSearchDescription] = useState('');
 
-  useEffect(() => {
-    const fetchExpenses = async () => {
-      if (user && token && currentStore && currentStore.id) {
-        setIsLoading(true);
-        try {
-          const response = await api.getExpenses(token, user.client_id, currentStore.id, '', '');
-          console.log('Raw API response:', response);
-          if (Array.isArray(response)) {
-            setExpenses(response);
-            setFilteredExpenses(response);
-          } else {
-            setExpenses([]);
-            setFilteredExpenses([]);
-          }
-        } catch (error) {
-          console.error("Failed to fetch expenses:", error);
+  const fetchExpenses = useCallback(async () => {
+    if (user && token && currentStore && currentStore.id) {
+      setIsLoading(true);
+      try {
+        const response = await api.getExpenses(token, user.client_id, currentStore.id, '', '');
+        console.log('Raw API response:', response);
+        if (Array.isArray(response)) {
+          setExpenses(response);
+          setFilteredExpenses(response);
+        } else {
           setExpenses([]);
           setFilteredExpenses([]);
-        } finally {
-          setIsLoading(false);
         }
+      } catch (error) {
+        console.error("Failed to fetch expenses:", error);
+        setExpenses([]);
+        setFilteredExpenses([]);
+      } finally {
+        setIsLoading(false);
       }
-    };
+    }
+  }, [user, token, currentStore]);
 
+  useEffect(() => {
     if (currentStore && currentStore.id) { // Only fetch if a store is selected
       fetchExpenses();
     } else {
@@ -66,20 +66,20 @@ export default function ExpensesPage() {
       setExpenses([]);
       setFilteredExpenses([]);
     }
-  }, [user, token, currentStore]);
+  }, [currentStore, fetchExpenses]);
 
   useEffect(() => {
-    let filtered = expenses;
+    let filtered = expenses.filter(expense => expense != null);
 
     if (searchRefNum) {
       filtered = filtered.filter(expense =>
-        expense.ref_num.toLowerCase().includes(searchRefNum.toLowerCase())
+        expense.ref_num?.toLowerCase().includes(searchRefNum.toLowerCase())
       );
     }
 
     if (searchDescription) {
       filtered = filtered.filter(expense =>
-        expense.description.toLowerCase().includes(searchDescription.toLowerCase())
+        expense.description?.toLowerCase().includes(searchDescription.toLowerCase())
       );
     }
 
@@ -118,7 +118,7 @@ export default function ExpensesPage() {
       
       const newExpenseRecord = await api.createExpense(token, expenseData);
       if (newExpenseRecord) {
-        const updatedExpenses = [newExpenseRecord, ...expenses];
+        const updatedExpenses = [newExpenseRecord, ...expenses.filter(exp => exp != null)];
         setExpenses(updatedExpenses);
         setFilteredExpenses(updatedExpenses);
       }
@@ -142,8 +142,14 @@ export default function ExpensesPage() {
     if (!editingExpense || !token) return;
 
     try {
+      console.log('Updating expense:', editingExpense);
       const updatedExpense = await api.updateExpense(token, editingExpense.ref_num, editingExpense);
-      setExpenses(expenses.map(exp => exp.ref_num === editingExpense.ref_num ? updatedExpense.expense : exp));
+      console.log('Update response:', updatedExpense);
+      
+      // Re-fetch all expenses to ensure we have the latest data
+      await fetchExpenses();
+      console.log('Expenses refreshed after update');
+      
       setIsEditing(false);
       setEditingExpense(null);
     } catch (error) {
@@ -156,7 +162,7 @@ export default function ExpensesPage() {
 
     try {
       await api.deleteExpense(token, refNum);
-      const updatedExpenses = expenses.filter(exp => exp.ref_num !== refNum);
+      const updatedExpenses = expenses.filter(exp => exp != null && exp.ref_num !== refNum);
       setExpenses(updatedExpenses);
       setFilteredExpenses(updatedExpenses);
     } catch (error) {
@@ -164,7 +170,7 @@ export default function ExpensesPage() {
     }
   };
 
-  const totalExpenses = filteredExpenses.reduce((sum, expense) => sum + (expense.amount || 0), 0);
+  const totalExpenses = filteredExpenses.filter(expense => expense != null).reduce((sum, expense) => sum + (expense.amount || 0), 0);
 
   if (isLoading) {
     return <div>Loading...</div>; // Or a spinner component
@@ -337,13 +343,13 @@ export default function ExpensesPage() {
                 </TableRow>
               </TableHeader>
             <TableBody>
-              {filteredExpenses.map((expense) => (
-                <TableRow key={expense.ref_num}>
-                  <TableCell>{expense.ref_num}</TableCell>
-                  <TableCell>{new Date(expense.expense_date).toLocaleDateString()}</TableCell>
-                  <TableCell>{expense.description}</TableCell>
-                  <TableCell>{expense.paid_to}</TableCell>
-                  <TableCell>{expense.store_name}</TableCell>
+              {filteredExpenses.filter(expense => expense != null).map((expense) => (
+                <TableRow key={expense.ref_num || Math.random()}>
+                  <TableCell>{expense.ref_num || 'N/A'}</TableCell>
+                  <TableCell>{expense.expense_date ? new Date(expense.expense_date).toLocaleDateString() : 'N/A'}</TableCell>
+                  <TableCell>{expense.description || 'N/A'}</TableCell>
+                  <TableCell>{expense.paid_to || 'N/A'}</TableCell>
+                  <TableCell>{expense.store_name || 'N/A'}</TableCell>
                   <TableCell>
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                       expense.payment_method === 'cash' ? 'bg-green-100 text-green-800' :
@@ -352,10 +358,10 @@ export default function ExpensesPage() {
                       expense.payment_method === 'transfer' ? 'bg-purple-100 text-purple-800' :
                       'bg-gray-100 text-gray-800'
                     }`}>
-                      {expense.payment_method.toUpperCase()}
+                      {expense.payment_method?.toUpperCase() || 'N/A'}
                     </span>
                   </TableCell>
-                  <TableCell className="text-right">{new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(expense.amount)}</TableCell>
+                  <TableCell className="text-right">{new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(expense.amount ?? 0)}</TableCell>
                   <TableCell>
                     {expense.supp_doc_url && 
                       <a href={expense.supp_doc_url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
@@ -384,23 +390,23 @@ export default function ExpensesPage() {
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="edit-ref_num">Reference No.</Label>
-                <Input id="edit-ref_num" value={editingExpense?.ref_num} readOnly className="col-span-3" />
+                <Input id="edit-ref_num" value={editingExpense?.ref_num || ''} readOnly className="col-span-3" />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="edit-date">Expense Date</Label>
-                <Input id="edit-date" type="date" value={editingExpense?.expense_date.split('T')[0]} onChange={(e) => setEditingExpense(editingExpense ? { ...editingExpense, expense_date: e.target.value } : null)} className="col-span-3" />
+                <Input id="edit-date" type="date" value={editingExpense?.expense_date?.split('T')[0] || ''} onChange={(e) => setEditingExpense(editingExpense ? { ...editingExpense, expense_date: e.target.value } : null)} className="col-span-3" />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="edit-description">Description</Label>
-                <Input id="edit-description" value={editingExpense?.description} onChange={(e) => setEditingExpense(editingExpense ? { ...editingExpense, description: e.target.value } : null)} className="col-span-3" />
+                <Input id="edit-description" value={editingExpense?.description || ''} onChange={(e) => setEditingExpense(editingExpense ? { ...editingExpense, description: e.target.value } : null)} className="col-span-3" />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="edit-paid_to">Paid To</Label>
-                <Input id="edit-paid_to" value={editingExpense?.paid_to} onChange={(e) => setEditingExpense(editingExpense ? { ...editingExpense, paid_to: e.target.value } : null)} className="col-span-3" />
+                <Input id="edit-paid_to" value={editingExpense?.paid_to || ''} onChange={(e) => setEditingExpense(editingExpense ? { ...editingExpense, paid_to: e.target.value } : null)} className="col-span-3" />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="edit-payment">Payment Method</Label>
-                <Select value={editingExpense?.payment_method} onValueChange={(value) => setEditingExpense(editingExpense ? { ...editingExpense, payment_method: value as 'cash' | 'card' | 'check' | 'transfer' } : null)}>
+                <Select value={editingExpense?.payment_method || 'cash'} onValueChange={(value) => setEditingExpense(editingExpense ? { ...editingExpense, payment_method: value as 'cash' | 'card' | 'check' | 'transfer' } : null)}>
                   <SelectTrigger className="col-span-3">
                     <SelectValue placeholder="Select payment method" />
                   </SelectTrigger>
@@ -414,7 +420,7 @@ export default function ExpensesPage() {
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="edit-amount">Amount</Label>
-                <Input id="edit-amount" type="number" step="0.01" value={editingExpense?.amount} onChange={(e) => setEditingExpense(editingExpense ? { ...editingExpense, amount: parseFloat(e.target.value) } : null)} className="col-span-3" />
+                <Input id="edit-amount" type="number" step="0.01" value={editingExpense?.amount ?? ''} onChange={(e) => setEditingExpense(editingExpense ? { ...editingExpense, amount: parseFloat(e.target.value) } : null)} className="col-span-3" />
               </div>
             </div>
             <DialogFooter>
