@@ -9,6 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatCurrency } from '@/lib/utils';
+import { Printer } from 'lucide-react';
 
 export default function ReportsPage() {
   const { user, token } = useAuth();
@@ -60,6 +61,154 @@ export default function ReportsPage() {
     }
   };
 
+  const handlePrint = () => {
+    if (!reportData) return;
+    
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const selectedStoreName = selectedStore === 'all' ? 'All Stores' : stores.find(store => store.id === selectedStore)?.name || 'Selected Store';
+
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Financial Report - ${selectedStoreName}</title>
+          <style>
+            @media print {
+              @page { margin: 0.5in; }
+            }
+            body { 
+              font-family: Arial, sans-serif; 
+              margin: 0; 
+              padding: 20px;
+              color: #333;
+            }
+            .header {
+              text-align: center;
+              margin-bottom: 30px;
+              border-bottom: 2px solid #333;
+              padding-bottom: 20px;
+            }
+            .store-name {
+              font-size: 24px;
+              font-weight: bold;
+              margin-bottom: 10px;
+            }
+            .store-address {
+              font-size: 14px;
+              color: #666;
+              margin-bottom: 5px;
+            }
+            .report-title {
+              font-size: 18px;
+              font-weight: bold;
+              margin-top: 20px;
+            }
+            .report-info {
+              margin: 20px 0;
+              font-size: 12px;
+              color: #666;
+            }
+            .report-grid {
+              display: grid;
+              grid-template-columns: repeat(2, 1fr);
+              gap: 20px;
+              margin: 30px 0;
+            }
+            .report-item {
+              border: 1px solid #ddd;
+              padding: 20px;
+              text-align: center;
+              background-color: #f9f9f9;
+            }
+            .report-item-label {
+              font-size: 14px;
+              color: #666;
+              margin-bottom: 10px;
+            }
+            .report-item-value {
+              font-size: 24px;
+              font-weight: bold;
+              color: #333;
+            }
+            .summary-section {
+              margin-top: 30px;
+              padding: 20px;
+              background-color: #f0f8ff;
+              border: 1px solid #b3d9ff;
+            }
+            .summary-title {
+              font-size: 16px;
+              font-weight: bold;
+              margin-bottom: 10px;
+              color: #0066cc;
+            }
+            .footer {
+              margin-top: 30px;
+              text-align: center;
+              font-size: 10px;
+              color: #666;
+              border-top: 1px solid #ddd;
+              padding-top: 10px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="store-name">${selectedStoreName}</div>
+            <div class="store-address">Financial Report</div>
+          </div>
+          
+          <div class="report-title">Financial Summary Report</div>
+          <div class="report-info">
+            Generated on: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}<br>
+            Report Period: ${fromDate} to ${toDate}<br>
+            Store: ${selectedStoreName}
+          </div>
+          
+          <div class="report-grid">
+            <div class="report-item">
+              <div class="report-item-label">Total Sales</div>
+              <div class="report-item-value">${reportData.totalSales.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            </div>
+            <div class="report-item">
+              <div class="report-item-label">Total Purchases</div>
+              <div class="report-item-value">${reportData.totalPurchases.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            </div>
+            <div class="report-item">
+              <div class="report-item-label">Total Expenses</div>
+              <div class="report-item-value">${reportData.totalExpenses.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            </div>
+            <div class="report-item">
+              <div class="report-item-label">Gross Income</div>
+              <div class="report-item-value">${reportData.grossIncome.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            </div>
+          </div>
+          
+          <div class="summary-section">
+            <div class="summary-title">Financial Summary</div>
+            <p><strong>Total Sales:</strong> ${reportData.totalSales.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+            <p><strong>Total Purchases:</strong> ${reportData.totalPurchases.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+            <p><strong>Total Expenses:</strong> ${reportData.totalExpenses.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+            <p><strong>Gross Income:</strong> ${reportData.grossIncome.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+          </div>
+          
+          <div class="footer">
+            This report was generated by FTS (Financial Transaction System)<br>
+            Arkware Technologies
+          </div>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+    printWindow.close();
+  };
+
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold">Reports</h1>
@@ -94,6 +243,16 @@ export default function ReportsPage() {
               </Select>
             </div>
             <Button onClick={handleGenerateReport}>Generate Report</Button>
+            {reportData && (
+              <Button 
+                variant="outline" 
+                onClick={handlePrint}
+                className="flex items-center space-x-2"
+              >
+                <Printer className="h-4 w-4" />
+                <span>Print Report</span>
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>

@@ -14,6 +14,7 @@ import { useStore } from '@/contexts/StoreContext';
 import { api, CreatePurchaseRequest } from '@/lib/api';
 import { useEffect } from 'react';
 import Image from "next/image";
+import { Printer } from 'lucide-react';
 
 interface Purchase {
   ref_num: string;
@@ -48,6 +49,11 @@ export default function PurchasesPage() {
   const [deletingPurchase, setDeletingPurchase] = useState<Purchase | null>(null);
   const [searchRefNum, setSearchRefNum] = useState('');
   const [searchDescription, setSearchDescription] = useState('');
+  const [dateFilter, setDateFilter] = useState('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [recordsPerPage] = useState(20);
 
   useEffect(() => {
     const fetchPurchases = async () => {
@@ -63,18 +69,56 @@ export default function PurchasesPage() {
   }, [token, currentStore, user]);
 
   useEffect(() => {
-    let filtered = purchases;
+    let filtered = purchases.filter(purchase => purchase != null);
 
     if (searchRefNum) {
-      filtered = filtered.filter(p => p.ref_num.toLowerCase().includes(searchRefNum.toLowerCase()));
+      filtered = filtered.filter(purchase =>
+        purchase.ref_num?.toLowerCase().includes(searchRefNum.toLowerCase())
+      );
     }
 
     if (searchDescription) {
-      filtered = filtered.filter(p => p.description.toLowerCase().includes(searchDescription.toLowerCase()));
+      filtered = filtered.filter(purchase =>
+        purchase.description?.toLowerCase().includes(searchDescription.toLowerCase())
+      );
+    }
+
+    // Date filtering
+    if (dateFilter !== 'all') {
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      
+      filtered = filtered.filter(purchase => {
+        if (!purchase.purchase_date) return false;
+        const purchaseDate = new Date(purchase.purchase_date);
+        
+        switch (dateFilter) {
+          case 'today':
+            return purchaseDate >= today;
+          case 'thisWeek':
+            const startOfWeek = new Date(today);
+            startOfWeek.setDate(today.getDate() - today.getDay());
+            return purchaseDate >= startOfWeek;
+          case 'thisMonth':
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+            return purchaseDate >= startOfMonth;
+          case 'custom':
+            if (dateFrom && dateTo) {
+              const fromDate = new Date(dateFrom);
+              const toDate = new Date(dateTo);
+              toDate.setHours(23, 59, 59, 999);
+              return purchaseDate >= fromDate && purchaseDate <= toDate;
+            }
+            return true;
+          default:
+            return true;
+        }
+      });
     }
 
     setFilteredPurchases(filtered);
-  }, [purchases, searchRefNum, searchDescription]);
+    setCurrentPage(1);
+  }, [searchRefNum, searchDescription, dateFilter, dateFrom, dateTo, purchases]);
 
   const handleCreatePurchase = async () => {
     if (!newPurchase.amount || !newPurchase.description.trim() || !newPurchase.supplier.trim()) {
@@ -183,6 +227,152 @@ export default function PurchasesPage() {
   };
 
   const totalPurchases = filteredPurchases.reduce((sum, purchase) => sum + purchase.amount, 0);
+  
+  // Pagination calculations
+  const validPurchases = filteredPurchases.filter(purchase => purchase != null);
+  const totalPages = Math.ceil(validPurchases.length / recordsPerPage);
+  const startIndex = (currentPage - 1) * recordsPerPage;
+  const endIndex = startIndex + recordsPerPage;
+  const currentPurchases = validPurchases.slice(startIndex, endIndex);
+
+  const handlePrint = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Purchases Report - ${currentStore?.name || 'Store'}</title>
+          <style>
+            @media print {
+              @page { margin: 0.5in; }
+            }
+            body { 
+              font-family: Arial, sans-serif; 
+              margin: 0; 
+              padding: 20px;
+              color: #333;
+            }
+            .header {
+              text-align: center;
+              margin-bottom: 30px;
+              border-bottom: 2px solid #333;
+              padding-bottom: 20px;
+            }
+            .store-name {
+              font-size: 24px;
+              font-weight: bold;
+              margin-bottom: 10px;
+            }
+            .store-address {
+              font-size: 14px;
+              color: #666;
+              margin-bottom: 5px;
+            }
+            .report-title {
+              font-size: 18px;
+              font-weight: bold;
+              margin-top: 20px;
+            }
+            .report-info {
+              margin: 20px 0;
+              font-size: 12px;
+              color: #666;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 20px;
+            }
+            th, td {
+              border: 1px solid #ddd;
+              padding: 8px;
+              text-align: left;
+              font-size: 12px;
+            }
+            th {
+              background-color: #f5f5f5;
+              font-weight: bold;
+            }
+            .amount {
+              text-align: right;
+            }
+            .total-section {
+              margin-top: 20px;
+              text-align: right;
+              font-weight: bold;
+            }
+            .footer {
+              margin-top: 30px;
+              text-align: center;
+              font-size: 10px;
+              color: #666;
+              border-top: 1px solid #ddd;
+              padding-top: 10px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="store-name">${currentStore?.name || 'Store Name'}</div>
+            <div class="store-address">${currentStore?.location || 'Store Address'}</div>
+          </div>
+          
+          <div class="report-title">Purchases Report</div>
+          <div class="report-info">
+            Generated on: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}<br>
+            Total Records: ${validPurchases.length}<br>
+            Date Filter: ${dateFilter === 'all' ? 'All Time' : 
+              dateFilter === 'today' ? 'Today' :
+              dateFilter === 'thisWeek' ? 'This Week' :
+              dateFilter === 'thisMonth' ? 'This Month' :
+              dateFilter === 'custom' ? `From ${dateFrom} to ${dateTo}` : 'All Time'}
+          </div>
+          
+          <table>
+            <thead>
+              <tr>
+                <th>Reference No.</th>
+                <th>Date</th>
+                <th>Description</th>
+                <th>Supplier</th>
+                <th>Payment Method</th>
+                <th class="amount">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${validPurchases.map(purchase => `
+                <tr>
+                  <td>${purchase.ref_num}</td>
+                  <td>${new Date(purchase.purchase_date).toLocaleDateString()}</td>
+                  <td>${purchase.description}</td>
+                  <td>${purchase.supplier}</td>
+                  <td>${purchase.payment_method.toUpperCase()}</td>
+                  <td class="amount">₱${purchase.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          
+          <div class="total-section">
+            <div>Total Purchases: ${totalPurchases.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+          </div>
+          
+          <div class="footer">
+            This report was generated by FTS (Financial Transaction System)<br>
+            Arkware Technologies
+          </div>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+    printWindow.close();
+  };
 
   return (
     <div className="space-y-6">
@@ -192,10 +382,21 @@ export default function PurchasesPage() {
           <p className="mt-2 text-gray-600">Record and track your purchase transactions</p>
         </div>
         
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>Record New Purchase</Button>
-          </DialogTrigger>
+        <div className="flex space-x-2">
+          <Button 
+            variant="outline" 
+            onClick={handlePrint}
+            disabled={!currentStore || validPurchases.length === 0}
+            className="flex items-center space-x-2"
+          >
+            <Printer className="h-4 w-4" />
+            <span>Print Report</span>
+          </Button>
+          
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>Record New Purchase</Button>
+            </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Record New Purchase</DialogTitle>
@@ -333,6 +534,7 @@ export default function PurchasesPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {/* Edit Purchase Dialog */}
@@ -466,6 +668,40 @@ export default function PurchasesPage() {
               onChange={(e) => setSearchDescription(e.target.value)}
             />
           </div>
+          
+          <div className="flex space-x-4 mb-4">
+            <Select value={dateFilter} onValueChange={setDateFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Filter by date" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Time</SelectItem>
+                <SelectItem value="today">Today</SelectItem>
+                <SelectItem value="thisWeek">This Week</SelectItem>
+                <SelectItem value="thisMonth">This Month</SelectItem>
+                <SelectItem value="custom">Custom Range</SelectItem>
+              </SelectContent>
+            </Select>
+            
+            {dateFilter === 'custom' && (
+              <>
+                <Input
+                  type="date"
+                  placeholder="From date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  className="w-[150px]"
+                />
+                <Input
+                  type="date"
+                  placeholder="To date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  className="w-[150px]"
+                />
+              </>
+            )}
+          </div>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -481,7 +717,7 @@ export default function PurchasesPage() {
                 </TableRow>
               </TableHeader>
             <TableBody>
-              {filteredPurchases.map((purchase) => (
+              {currentPurchases.map((purchase) => (
                 <TableRow key={purchase.ref_num}>
                   <TableCell>{purchase.ref_num}</TableCell>
                   <TableCell>{new Date(purchase.purchase_date).toLocaleDateString()}</TableCell>
@@ -602,6 +838,48 @@ export default function PurchasesPage() {
               ))}
             </TableBody>
           </Table>
+          </div>
+          
+          <div className="mt-4 flex justify-between items-center">
+            <div className="text-sm text-muted-foreground">
+              Showing {startIndex + 1} to {Math.min(endIndex, validPurchases.length)} of {validPurchases.length} records
+            </div>
+            
+            {totalPages > 1 && (
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                >
+                  Previous
+                </Button>
+                
+                <div className="flex items-center space-x-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                    <Button
+                      key={page}
+                      variant={currentPage === page ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setCurrentPage(page)}
+                      className="w-8 h-8 p-0"
+                    >
+                      {page}
+                    </Button>
+                  ))}
+                </div>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

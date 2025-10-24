@@ -14,6 +14,7 @@ import { useStore } from '@/contexts/StoreContext';
 import { api } from '@/lib/api';
 import { useEffect } from 'react';
 import Image from "next/image";
+import { Printer } from 'lucide-react';
 
 interface Sale {
   ref_num: string;
@@ -41,20 +42,21 @@ export default function SalesPage() {
   const [editingSale, setEditingSale] = useState<Sale | null>(null);
   const [searchRefNum, setSearchRefNum] = useState('');
   const [searchDescription, setSearchDescription] = useState('');
+  const [dateFilter, setDateFilter] = useState('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [pageSize] = useState(10);
+  const [pageSize] = useState(20);
+  const [filteredSales, setFilteredSales] = useState<Sale[]>([]);
 
   useEffect(() => {
     const fetchSales = async () => {
       if (token && user?.client_id && currentStore?.id) {
         try {
-          const response = await api.getSalesByClient(token, user.client_id, currentStore.id, searchRefNum, searchDescription, currentPage, pageSize);
+          const response = await api.getSalesByClient(token, user.client_id, currentStore.id, '', '', 1, 1000); // Fetch all sales for client-side filtering
           setSales(response.sales);
-          setTotalPages(Math.ceil(response.count / pageSize));
         } catch (error) {
           console.error('Failed to fetch sales:', error);
-          // Optionally, show an error message to the user
         }
       }
     };
@@ -63,9 +65,60 @@ export default function SalesPage() {
       fetchSales();
     } else {
       setSales([]);
-      setTotalPages(1);
     }
-  }, [token, user?.client_id, currentStore, searchRefNum, searchDescription, currentPage, pageSize]);
+  }, [token, user?.client_id, currentStore]);
+
+  useEffect(() => {
+    let filtered = sales.filter(sale => sale != null);
+
+    if (searchRefNum) {
+      filtered = filtered.filter(sale =>
+        sale.ref_num?.toLowerCase().includes(searchRefNum.toLowerCase())
+      );
+    }
+
+    if (searchDescription) {
+      filtered = filtered.filter(sale =>
+        sale.description?.toLowerCase().includes(searchDescription.toLowerCase())
+      );
+    }
+
+    // Date filtering
+    if (dateFilter !== 'all') {
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      
+      filtered = filtered.filter(sale => {
+        if (!sale.sales_date) return false;
+        const saleDate = new Date(sale.sales_date);
+        
+        switch (dateFilter) {
+          case 'today':
+            return saleDate >= today;
+          case 'thisWeek':
+            const startOfWeek = new Date(today);
+            startOfWeek.setDate(today.getDate() - today.getDay());
+            return saleDate >= startOfWeek;
+          case 'thisMonth':
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+            return saleDate >= startOfMonth;
+          case 'custom':
+            if (dateFrom && dateTo) {
+              const fromDate = new Date(dateFrom);
+              const toDate = new Date(dateTo);
+              toDate.setHours(23, 59, 59, 999);
+              return saleDate >= fromDate && saleDate <= toDate;
+            }
+            return true;
+          default:
+            return true;
+        }
+      });
+    }
+
+    setFilteredSales(filtered);
+    setCurrentPage(1);
+  }, [searchRefNum, searchDescription, dateFilter, dateFrom, dateTo, sales]);
 
   const handleCreateSale = async () => {
     if (!newSale.ref_num.trim() || !newSale.amount || !newSale.description.trim()) return;
@@ -156,7 +209,153 @@ export default function SalesPage() {
     }
   };
 
-  const totalSales = sales.reduce((sum, sale) => sum + sale.amount, 0);
+  const totalSales = filteredSales.reduce((sum, sale) => sum + sale.amount, 0);
+  
+  // Pagination calculations
+  const validSales = filteredSales.filter(sale => sale != null);
+  const totalPages = Math.ceil(validSales.length / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const currentSales = validSales.slice(startIndex, endIndex);
+
+  const handlePrint = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Sales Report - ${currentStore?.name || 'Store'}</title>
+          <style>
+            @media print {
+              @page { margin: 0.5in; }
+            }
+            body { 
+              font-family: Arial, sans-serif; 
+              margin: 0; 
+              padding: 20px;
+              color: #333;
+            }
+            .header {
+              text-align: center;
+              margin-bottom: 30px;
+              border-bottom: 2px solid #333;
+              padding-bottom: 20px;
+            }
+            .store-name {
+              font-size: 24px;
+              font-weight: bold;
+              margin-bottom: 10px;
+            }
+            .store-address {
+              font-size: 14px;
+              color: #666;
+              margin-bottom: 5px;
+            }
+            .report-title {
+              font-size: 18px;
+              font-weight: bold;
+              margin-top: 20px;
+            }
+            .report-info {
+              margin: 20px 0;
+              font-size: 12px;
+              color: #666;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 20px;
+            }
+            th, td {
+              border: 1px solid #ddd;
+              padding: 8px;
+              text-align: left;
+              font-size: 12px;
+            }
+            th {
+              background-color: #f5f5f5;
+              font-weight: bold;
+            }
+            .amount {
+              text-align: right;
+            }
+            .total-section {
+              margin-top: 20px;
+              text-align: right;
+              font-weight: bold;
+            }
+            .footer {
+              margin-top: 30px;
+              text-align: center;
+              font-size: 10px;
+              color: #666;
+              border-top: 1px solid #ddd;
+              padding-top: 10px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="store-name">${currentStore?.name || 'Store Name'}</div>
+            <div class="store-address">${currentStore?.location || 'Store Address'}</div>
+          </div>
+          
+          <div class="report-title">Sales Report</div>
+          <div class="report-info">
+            Generated on: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}<br>
+            Total Records: ${validSales.length}<br>
+            Date Filter: ${dateFilter === 'all' ? 'All Time' : 
+              dateFilter === 'today' ? 'Today' :
+              dateFilter === 'thisWeek' ? 'This Week' :
+              dateFilter === 'thisMonth' ? 'This Month' :
+              dateFilter === 'custom' ? `From ${dateFrom} to ${dateTo}` : 'All Time'}
+          </div>
+          
+          <table>
+            <thead>
+              <tr>
+                <th>Reference No.</th>
+                <th>Date</th>
+                <th>Description</th>
+                <th>Store</th>
+                <th>Payment Method</th>
+                <th class="amount">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${validSales.map(sale => `
+                <tr>
+                  <td>${sale.ref_num}</td>
+                  <td>${new Date(sale.sales_date).toLocaleDateString()}</td>
+                  <td>${sale.description}</td>
+                  <td>${sale.store_name || 'N/A'}</td>
+                  <td>${sale.payment_method.toUpperCase()}</td>
+                  <td class="amount">₱${sale.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          
+          <div class="total-section">
+            <div>Total Sales: ${totalSales.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+          </div>
+          
+          <div class="footer">
+            This report was generated by FTS (Financial Transaction System)<br>
+            Arkware Technologies
+          </div>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+    printWindow.close();
+  };
 
   return (
     <div className="space-y-6">
@@ -166,10 +365,21 @@ export default function SalesPage() {
           <p className="mt-2 text-gray-600">Record and track your sales transactions</p>
         </div>
         
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button disabled={!currentStore}>Record New Sale</Button>
-          </DialogTrigger>
+        <div className="flex space-x-2">
+          <Button 
+            variant="outline" 
+            onClick={handlePrint}
+            disabled={!currentStore || validSales.length === 0}
+            className="flex items-center space-x-2"
+          >
+            <Printer className="h-4 w-4" />
+            <span>Print Report</span>
+          </Button>
+          
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button disabled={!currentStore}>Record New Sale</Button>
+            </DialogTrigger>
           <DialogContent className="max-w-[95vw] sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Record New Sale</DialogTitle>
@@ -265,6 +475,7 @@ export default function SalesPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
 
@@ -366,7 +577,7 @@ export default function SalesPage() {
                 {totalSales.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
               <p className="text-sm text-gray-600 mt-2">
-                {sales.length} transactions recorded
+                {filteredSales.length} transactions recorded
               </p>
             </CardContent>
           </Card>
@@ -378,21 +589,51 @@ export default function SalesPage() {
         </CardHeader>
         <CardContent>
           {/* Search and Filter UI */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 mb-4">
-            <div className="flex-1">
-              <Input
-                placeholder="Search by reference number..."
-                value={searchRefNum}
-                onChange={(e) => setSearchRefNum(e.target.value)}
-              />
-            </div>
-            <div className="flex-1">
-              <Input
-                placeholder="Search by description..."
-                value={searchDescription}
-                onChange={(e) => setSearchDescription(e.target.value)}
-              />
-            </div>
+          <div className="flex space-x-4 mb-4">
+            <Input
+              placeholder="Search by reference number..."
+              value={searchRefNum}
+              onChange={(e) => setSearchRefNum(e.target.value)}
+            />
+            <Input
+              placeholder="Search by description..."
+              value={searchDescription}
+              onChange={(e) => setSearchDescription(e.target.value)}
+            />
+          </div>
+          
+          <div className="flex space-x-4 mb-4">
+            <Select value={dateFilter} onValueChange={setDateFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Filter by date" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Time</SelectItem>
+                <SelectItem value="today">Today</SelectItem>
+                <SelectItem value="thisWeek">This Week</SelectItem>
+                <SelectItem value="thisMonth">This Month</SelectItem>
+                <SelectItem value="custom">Custom Range</SelectItem>
+              </SelectContent>
+            </Select>
+            
+            {dateFilter === 'custom' && (
+              <>
+                <Input
+                  type="date"
+                  placeholder="From date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  className="w-[150px]"
+                />
+                <Input
+                  type="date"
+                  placeholder="To date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  className="w-[150px]"
+                />
+              </>
+            )}
           </div>
           <div className="overflow-x-auto">
             <Table>
@@ -409,7 +650,7 @@ export default function SalesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sales.map((sale) => (
+              {currentSales.map((sale) => (
                 <TableRow key={sale.ref_num}>
                   <TableCell>{sale.ref_num}</TableCell>
                   <TableCell>{new Date(sale.sales_date).toLocaleDateString()}</TableCell>
@@ -450,28 +691,46 @@ export default function SalesPage() {
             </TableBody>
           </Table>
           </div>
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4">
-            <div className="text-sm text-gray-600">
-              Page {currentPage} of {totalPages}
+          <div className="mt-4 flex justify-between items-center">
+            <div className="text-sm text-muted-foreground">
+              Showing {startIndex + 1} to {Math.min(endIndex, validSales.length)} of {validSales.length} records
             </div>
-            <div className="flex items-center space-x-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
-              >
-                Previous
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages}
-              >
-                Next
-              </Button>
-            </div>
+            
+            {totalPages > 1 && (
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                >
+                  Previous
+                </Button>
+                
+                <div className="flex items-center space-x-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                    <Button
+                      key={page}
+                      variant={currentPage === page ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setCurrentPage(page)}
+                      className="w-8 h-8 p-0"
+                    >
+                      {page}
+                    </Button>
+                  ))}
+                </div>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
