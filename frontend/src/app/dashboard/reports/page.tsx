@@ -13,8 +13,9 @@ import { Printer } from 'lucide-react';
 
 export default function ReportsPage() {
   const { user, token } = useAuth();
-  const [fromDate, setFromDate] = useState<string>('');
-  const [toDate, setToDate] = useState<string>('');
+  const [dateFilter, setDateFilter] = useState('today');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [reportData, setReportData] = useState<{
     grossIncome: number;
     totalSales: number;
@@ -39,15 +40,91 @@ export default function ReportsPage() {
     fetchStores();
   }, [token, user?.client_id]);
 
+  useEffect(() => {
+    // Clear report data when filters change to prevent showing stale data
+    setReportData(null);
+    
+    // Auto-regenerate report when filters change
+    // Only run if we have token, user, and stores are loaded
+    if (token && user?.client_id && stores.length > 0) {
+      if (dateFilter === 'custom') {
+        // Only regenerate if custom dates are set
+        if (dateFrom && dateTo) {
+          handleGenerateReport();
+        }
+      } else {
+        // For preset filters (today, thisWeek, thisMonth), regenerate immediately
+        handleGenerateReport();
+      }
+    }
+  }, [dateFilter, dateFrom, dateTo, selectedStore, token, user, stores]);
+
+  const getDateRange = () => {
+    // Get current date in YYYY-MM-DD format using local timezone
+    const now = new Date();
+    const todayString = now.toLocaleDateString('en-CA'); // Returns YYYY-MM-DD format
+    
+    console.log('Current time:', now);
+    console.log('Today string (local):', todayString);
+    
+    switch (dateFilter) {
+      case 'today':
+        return {
+          from: todayString,
+          to: todayString
+        };
+      case 'thisWeek':
+        const startOfWeek = new Date(now);
+        startOfWeek.setDate(now.getDate() - now.getDay());
+        return {
+          from: startOfWeek.toLocaleDateString('en-CA'),
+          to: todayString
+        };
+      case 'thisMonth':
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        return {
+          from: startOfMonth.toLocaleDateString('en-CA'),
+          to: todayString
+        };
+      case 'custom':
+        return {
+          from: dateFrom,
+          to: dateTo
+        };
+      default:
+        return {
+          from: todayString,
+          to: todayString
+        };
+    }
+  };
+
   const handleGenerateReport = async () => {
-    if (token && user?.client_id && fromDate && toDate) {
+    if (token && user?.client_id) {
       try {
+        const dateRange = getDateRange();
+        
+        if (!dateRange.from || !dateRange.to) {
+          alert('Please select a date range');
+          return;
+        }
+
+        // console.log('Date range being sent to API:', dateRange);
+        // console.log('Date filter:', dateFilter);
+        // console.log('Current date:', new Date().toISOString().split('T')[0]);
+
         const [grossIncomeRes, totalSalesRes, totalPurchasesRes, totalExpensesRes] = await Promise.all([
-          api.getGrossIncome(token, user.client_id, fromDate, toDate, selectedStore),
-          api.getTotalSalesByDate(token, user.client_id, fromDate, toDate, selectedStore),
-          api.getTotalPurchasesByDate(token, user.client_id, fromDate, toDate, selectedStore),
-          api.getTotalExpensesByDate(token, user.client_id, fromDate, toDate, selectedStore)
+          api.getGrossIncome(token, user.client_id, dateRange.from, dateRange.to, selectedStore),
+          api.getTotalSalesByDate(token, user.client_id, dateRange.from, dateRange.to, selectedStore),
+          api.getTotalPurchasesByDate(token, user.client_id, dateRange.from, dateRange.to, selectedStore),
+          api.getTotalExpensesByDate(token, user.client_id, dateRange.from, dateRange.to, selectedStore)
         ]);
+
+        // console.log('API Responses:');
+        // console.log('Gross Income:', grossIncomeRes);
+        // console.log('Total Sales:', totalSalesRes);
+        // console.log('Total Purchases:', totalPurchasesRes);
+        // console.log('Total Expenses:', totalExpensesRes);
 
         setReportData({
           grossIncome: grossIncomeRes.grossIncome,
@@ -163,7 +240,11 @@ export default function ReportsPage() {
           <div class="report-title">Financial Summary Report</div>
           <div class="report-info">
             Generated on: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}<br>
-            Report Period: ${fromDate} to ${toDate}<br>
+            Report Period: ${getDateRange().from} to ${getDateRange().to}<br>
+            Date Filter: ${dateFilter === 'today' ? 'Today' :
+              dateFilter === 'thisWeek' ? 'This Week' :
+              dateFilter === 'thisMonth' ? 'This Month' :
+              dateFilter === 'custom' ? `Custom Range (${dateFrom} to ${dateTo})` : 'Today'}<br>
             Store: ${selectedStoreName}
           </div>
           
@@ -219,14 +300,6 @@ export default function ReportsPage() {
         <CardContent className="space-y-4">
           <div className="flex items-end space-x-4">
             <div className="grid gap-2">
-              <Label>From Date</Label>
-              <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
-            </div>
-            <div className="grid gap-2">
-              <Label>To Date</Label>
-              <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
-            </div>
-            <div className="grid gap-2">
               <Label>Store</Label>
               <Select value={selectedStore} onValueChange={setSelectedStore}>
                 <SelectTrigger>
@@ -242,6 +315,20 @@ export default function ReportsPage() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="grid gap-2">
+              <Label>Filter</Label>
+              <Select value={dateFilter} onValueChange={setDateFilter}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Filter by date" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="today">Today</SelectItem>
+                  <SelectItem value="thisWeek">This Week</SelectItem>
+                  <SelectItem value="thisMonth">This Month</SelectItem>
+                  <SelectItem value="custom">Custom Range</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <Button onClick={handleGenerateReport}>Generate Report</Button>
             {reportData && (
               <Button 
@@ -254,6 +341,25 @@ export default function ReportsPage() {
               </Button>
             )}
           </div>
+          
+          {dateFilter === 'custom' && (
+            <div className="flex space-x-4">
+              <Input
+                type="date"
+                placeholder="From date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="w-[150px]"
+              />
+              <Input
+                type="date"
+                placeholder="To date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="w-[150px]"
+              />
+            </div>
+          )}
         </CardContent>
       </Card>
       {reportData && (
