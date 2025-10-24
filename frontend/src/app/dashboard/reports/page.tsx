@@ -22,7 +22,7 @@ export default function ReportsPage() {
     totalPurchases: number;
     totalExpenses: number;
   } | null>(null);
-  const [stores, setStores] = useState<{ id: string; name: string }[]>([]);
+  const [stores, setStores] = useState<{ id: string; name: string; location?: string }[]>([]);
   const [selectedStore, setSelectedStore] = useState<string>('all');
 
   useEffect(() => {
@@ -145,6 +145,7 @@ export default function ReportsPage() {
     if (!printWindow) return;
 
     const selectedStoreName = selectedStore === 'all' ? 'All Stores' : stores.find(store => store.id === selectedStore)?.name || 'Selected Store';
+    const selectedStoreAddress = selectedStore === 'all' ? 'Multiple Locations' : stores.find(store => store.id === selectedStore)?.location || 'Store Address';
 
     const printContent = `
       <!DOCTYPE html>
@@ -234,7 +235,7 @@ export default function ReportsPage() {
         <body>
           <div class="header">
             <div class="store-name">${selectedStoreName}</div>
-            <div class="store-address">Financial Report</div>
+            <div class="store-address">${selectedStoreAddress}</div>
           </div>
           
           <div class="report-title">Financial Summary Report</div>
